@@ -1,16 +1,14 @@
 import os
 import sys
-import json
-import shutil
 import importlib
 import contextlib
-import subprocess
-from importlib.util import module_from_spec, spec_from_file_location\
+from importlib.util import module_from_spec, spec_from_file_location
 
 import rich
 import rich.tree
 import click
 
+from tip import config, environment, packages
 from tip.tip_meta_finder import TipMetaFinder
 
 
@@ -21,41 +19,35 @@ def app():
 
 
 @app.command()
-@click.option('--env', '-e', 'environment_path')
-@click.argument('packages', type=str, nargs=-1)
-def install(packages: tuple[str], environment_path: str):
+@click.option('--env', '-e', 'environment_path', type=str)
+@click.argument('package_strings', type=str, nargs=-1)
+def install(package_strings: tuple[str], environment_path: str):
     """
-    Download and install PACKAGES to make them runnable with `tip run`.
+    Download and install packages by PACKAGE_STRINGS to make them runnable with `tip run`.
 
-    In order to run this command make sure you have set the TIP_SITE_PACKAGES environment variable. It must contain
-    an absolute path to a folder where the packages will be downloaded.
+    PACKAGE_STRINGS is an array of package strings "<package_name>==<package_version>". In order to run this command
+    make sure you have set the TIP_HOME environment variable. It must contain an absolute path to a folder where the
+    packages will be downloaded.
     """
-    packages = list(packages)
-    if environment_path is not None:
-        environment = _read_environment(environment_path)
-        packages.extend([f"{package_name}=={package_version}" for package_name, package_version in environment.items()])
-    _validate_package_names(packages)
-    for package in packages:
-        _install_package(package)
+    _install(package_strings, environment_path)
 
 
 @app.command()
-@click.option('--env', '-e', 'environment_path')
-@click.argument('packages', type=str, nargs=-1)
-def remove(packages: tuple[str], environment_path: str):
+@click.argument('package_strings', type=str, nargs=-1)
+def uninstall(package_strings: tuple[str]):
     """
-    Remove PACKAGES from the environment.
+    Remove packages identified by package strings from site-packages.
     """
-    packages = list(packages)
-    if environment_path is not None:
-        environment = _read_environment(environment_path)
-        packages.extend([f"{package_name}=={package_version}" for package_name, package_version in environment.items()])
-    if len(packages) == 0:
-        click.echo("No packages to remove")
-        return
-    _validate_package_names(packages)
-    for package in packages:
-        _remove_package(package)
+    existing_package_strings = []
+    for package_string in package_strings:
+        if not packages.is_valid(package_string):
+            click.ClickException("Incorrect package string '%s'", package_string)
+        if not packages.is_installed(package_string):
+            click.echo(f"Package '{package_string}' is already removed, skipping")
+        else:
+            existing_package_strings.append(package_string)
+    for package_string in existing_package_strings:
+        packages.uninstall(package_string)
 
 
 @app.command(name='list')
@@ -63,7 +55,7 @@ def list_():
     """
     Show installed packages.
     """
-    site_packages_path = os.environ['TIP_SITE_PACKAGES']
+    site_packages_path = config.get_packages_dir()
     tree = rich.tree.Tree(site_packages_path)
     package_names = os.listdir(site_packages_path)
     for package_name in package_names:
@@ -89,21 +81,55 @@ def run(module_name: str, environment_path: str, install_missing: bool, args: tu
     is_module_name_given = isinstance(module_name, str) and len(module_name) > 0
     is_python_file_path_given = not is_module_name_given and len(args) > 0
     if not (is_module_name_given or is_python_file_path_given):
-        raise click.ClickException("Provide one of --module or python_file_path must be given")
+        raise click.ClickException("One of --module or python_file_path must be given")
     if is_python_file_path_given:
         python_file_path = args[0]
-    if environment_path is None:
-        environment_path = 'environment.json'
-    environment = _read_environment(environment_path)
+    if environment_path:
+        env = environment.get_environment(environment_path)
+    else:
+        env = environment.get_active_environment()
+    if env is None:
+        raise click.ClickException("Activate environment or provide environment path using `--env`")
     if install_missing:
-        _install_missing(environment)
-    packages_to_folders = _map_packages_to_folders(environment)
+        package_strings = [f"{name}=={version}" for name, version in env.items()]
+        _install(package_strings)
+    packages_to_folders = _map_packages_to_folders(env)
     finder = TipMetaFinder(packages_to_folders)
     sys.meta_path.insert(0, finder)
     if is_python_file_path_given:
         _run_file(python_file_path, args)
     else:
         _run_module(module_name, args)
+
+
+@app.command()
+@click.argument('environment_name', type=str)
+def create(environment_name: str):
+    """Create new environment."""
+    path = os.path.join(config.get_environments_dir(), environment_name + '.json')
+    environment.create_environment_file(None, path)
+
+
+@app.command()
+@click.option('--environment_path', '-e', 'environment_path', type=str, help="Path of the environment to add packages to")
+@click.option('--from_path', '-f', 'from_path', type=str, help="Environment to add all packages from")
+@click.argument('package_strings', type=str, nargs=-1)
+def add(package_strings: tuple[str], environment_path: str, from_path: str):
+    """
+    Add packages to the environment.
+
+    If ENVIRONMENT_PATH is specified, then packages are added to that environment, otherwise activated environment is
+    used. If FROM_PATH is specified, then all packages from that environment are also added to the target environment.
+    """
+    packages_to_add = []
+    if from_path:
+        env = environment.get_environment(from_path)
+        for package_name, package_version in env.items():
+            packages_to_add.append(f"{package_name}=={package_version}")
+    packages_to_add.extend(package_strings)
+    maybe_environment_path = environment_path if environment_path else None
+    for package_string in packages_to_add:
+        environment.add_to_environment(package_string, path=maybe_environment_path, replace=True)
 
 
 def _run_module(name: str, args):
@@ -128,14 +154,18 @@ def _run_file(filename: str, args):
         spec.loader.exec_module(module_to_run)
 
 
-def _remove_package(package: str):
-    package_name, package_version = package.split('==')
-    package_dir = os.path.join(os.environ['TIP_SITE_PACKAGES'], package_name, package_version)
-    if os.path.exists(package_dir):
-        shutil.rmtree(package_dir)
-        click.echo(f'Removed {package_name}=={package_version}')
-    else:
-        click.echo(f'Package {package_name} not found, skipping')
+def _install(package_strings: tuple[str], environment_path: str = None):
+    for package_string in package_strings:
+        if packages.is_valid(package_string):
+            continue
+        raise click.ClickException("Invalid package string: '%s'", package_string)
+    if environment_path is not None:
+        env = environment.get_environment(environment_path)
+    package_strings = list(package_strings)
+    env_package_strings = [f"{name}=={version}" for name, version in env.items()]
+    package_strings.extend(env_package_strings)
+    for package_string in package_strings:
+        packages.install(package_string)
 
 
 @contextlib.contextmanager
@@ -148,38 +178,10 @@ def _disable_pycache():
         sys.dont_write_bytecode = old_dont_write_bytecode
 
 
-def _install_missing(environment: dict):
-    for package_name, package_version in environment.items():
-        _install_package(f"{package_name}=={package_version}")
-
-
-def _read_environment(environment_path: str) -> dict:
-    try:
-        with open(environment_path, mode='r') as environment_file:
-            return json.load(environment_file)
-    except Exception as ex:
-        raise click.ClickException(f'Couldn\'t read environment file "{environment_path}": {ex}')
-
-
-def _install_package(package: str):
-    package_name, package_version = package.split('==')
-    package_dir = _get_package_dir(package_name, package_version)
-    if os.path.exists(package_dir):
-        click.echo(f"Package '{package}' is already installed")
-        return
-    os.makedirs(package_dir, exist_ok=True)
-    command = f"pip install --target={package_dir} {package}"
-    try:
-        subprocess.check_output(command, shell=True)
-    except Exception as ex:
-        shutil.rmtree(package_dir)
-        raise click.ClickException(f'Error while installing package "{package}: {ex}"')
-
-
-def _map_packages_to_folders(environment: dict) -> dict:
+def _map_packages_to_folders(env: dict) -> dict:
     packages_to_folders = {}
-    for package_name, package_version in environment.items():
-        package_dir = _get_package_dir(package_name, package_version)
+    for package_name, package_version in env.items():
+        package_dir = packages.locate(f"{package_name}=={package_version}")
         if not os.path.isdir(package_dir):
             raise click.ClickException(f"Package '{package_name}=={package_version}' is not installed")
         package_files = os.listdir(package_dir)
@@ -194,19 +196,3 @@ def _is_package_or_module(name: str) -> bool:
     is_package = os.path.exists(os.path.join(name, '__init__.py'))
     is_module = name.endswith('.py')
     return is_package or is_module
-
-
-def _validate_package_names(packages: tuple[str]):
-    for package_name in packages:
-        if '==' not in package_name:
-            raise click.ClickException(
-                f'Invalid package name: {package_name}, expected format: <package_name>==<package_version>'
-            )
-
-
-def _get_package_dir(package_name: str, package_version: str) -> str:
-    packages_dir = os.getenv('TIP_SITE_PACKAGES')
-    if packages_dir is None:
-        raise click.ClickException("TIP_SITE_PACKAGES environment variable is not set")
-    package_dir = os.path.join(packages_dir, package_name, package_version)
-    return package_dir
