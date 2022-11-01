@@ -105,3 +105,4 @@ TODO
 - Uninstall checks if uninstalled packages are in environments and proposes to remove them (maybe that's not necessary).
 - Print current environment name, path and package list.
 - When adding packages make sure they are not duplicated.
+- TIP based syntax highlighting in VSCode.
