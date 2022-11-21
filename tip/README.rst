@@ -106,3 +106,4 @@ TODO
 - Print current environment name, path and package list.
 - When adding packages make sure they are not duplicated.
 - TIP based syntax highlighting in VSCode.
+- Maybe prompt can be modified through `sys.ps1; sys.ps2`?
