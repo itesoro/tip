@@ -70,18 +70,24 @@ def list_():
 @app.command(context_settings={'ignore_unknown_options': True})
 @click.option('-m', '--module', 'module_name', type=str)
 @click.option('--env', '-e', 'environment_path')
+@click.option('-c', 'command')
 @click.option('--install-missing', 'install_missing', is_flag=True)
 @click.argument('args', nargs=-1, type=click.UNPROCESSED)
-def run(module_name: str, environment_path: str, install_missing: bool, args: tuple[str]):
+def run(module_name: str, command: str, environment_path: str, install_missing: bool, args: tuple[str]):
     """
     Run a module or a script using given environment at ENVIRONMENT_PATH.
 
     In order to use environment all packages must be installed.
     """
+    return _run(module_name, command, environment_path, install_missing, args)
+
+
+def _run(module_name: str, command: str, environment_path: str, install_missing: bool, args: tuple[str]):
     is_module_name_given = isinstance(module_name, str) and len(module_name) > 0
-    is_python_file_path_given = not is_module_name_given and len(args) > 0
-    if not (is_module_name_given or is_python_file_path_given):
-        raise click.ClickException("One of --module or python_file_path must be given")
+    is_command_given = isinstance(command, str) and len(command) > 0
+    is_python_file_path_given = not (is_module_name_given or is_command_given) and len(args) > 0
+    if not (is_module_name_given or is_python_file_path_given or is_command_given):
+        raise click.ClickException("One of --module, python_file_path or -c must be given")
     if is_python_file_path_given:
         python_file_path = args[0]
     if environment_path:
@@ -95,11 +101,26 @@ def run(module_name: str, environment_path: str, install_missing: bool, args: tu
         _install(package_strings)
     packages_to_folders = _map_packages_to_folders(env)
     finder = TipMetaFinder(packages_to_folders)
+    # TODO: check if it's called first
+    # TODO: sys.path = ["site-packages"]
+    # TODO: site-packages = soft links to site-packages/package_name/package_version
     sys.meta_path.insert(0, finder)
     if is_python_file_path_given:
+        with open('/root/tip/commands.log', mode='a') as log_file:
+            log_file.write('RUN FILE' + '=' * 10 + '\n')
+            log_file.write(python_file_path + '\n')
         _run_file(python_file_path, args)
-    else:
+    elif is_module_name_given:
+        with open('/root/tip/commands.log', mode='a') as log_file:
+            log_file.write('RUN MODULE' + '=' * 10 + '\n')
+            log_file.write(module_name + '\n')
         _run_module(module_name, args)
+    else:
+        with open('/root/tip/commands.log', mode='a') as log_file:
+            log_file.write('RUN COMMAND' + '=' * 10 + '\n')
+            log_file.write(command + '\n')
+        ns = {}
+        exec(command, ns, ns)
 
 
 @app.command()
@@ -146,7 +167,7 @@ def _run_module(name: str, args):
 
 def _run_file(filename: str, args):
     module_name = "__main__"
-    sys.argv = [filename] + list(args)
+    sys.argv = list(args)
     spec = spec_from_file_location(module_name, filename)
     with _disable_pycache():
         module_to_run = module_from_spec(spec)
@@ -161,8 +182,10 @@ def _install(package_strings: tuple[str], environment_path: str = None):
         raise click.ClickException("Invalid package string: '%s'", package_string)
     if environment_path is not None:
         env = environment.get_environment(environment_path)
+        env_package_strings = [f"{name}=={version}" for name, version in env.items()]
+    else:
+        env_package_strings = []
     package_strings = list(package_strings)
-    env_package_strings = [f"{name}=={version}" for name, version in env.items()]
     package_strings.extend(env_package_strings)
     for package_string in package_strings:
         packages.install(package_string)
