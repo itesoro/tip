@@ -1,5 +1,6 @@
 import os
 import sys
+import json
 import importlib
 import contextlib
 from importlib.util import module_from_spec, spec_from_file_location
@@ -16,6 +17,42 @@ from tip.tip_meta_finder import TipMetaFinder
 def app():
     """TIP package manager."""
     pass
+
+
+@app.command()
+@click.argument('home', type=str)
+def init(home):
+    """
+    Initialize user configuration file and tip home folder at HOME.
+    """
+    if os.path.isfile(home):
+        raise click.ClickException(f"{home} is a file")
+    if not os.path.exists(home):
+        os.makedirs(home)
+    else:
+        click.echo('Home directory already exists')
+    user_home_dir = os.path.expanduser('~')
+    user_config_path = os.path.join(user_home_dir, '.tip')
+    if os.path.isdir(user_config_path):
+        raise click.ClickException(f"{user_config_path} must be a file, found directory")
+    if not os.path.exists(user_config_path):
+        base_environment_path = os.path.join(home, "environments", "base.json")
+        if not os.path.exists(base_environment_path):
+            environment.create_environment_file({}, base_environment_path)
+        with open(user_config_path, mode='w') as user_config_file:
+            json.dump({
+                'home_dir': home,
+                'active_environment_name': 'base',
+            }, user_config_file)
+    else:
+        with open(user_config_path, mode='r') as user_config_file:
+            try:
+                user_config = json.load(user_config_file)
+            except Exception as ex:
+                raise click.ClickException(f"Invalid user configuration file: {ex}")
+        user_config['home_dir'] = home
+        with open(user_config_path, mode='w') as user_config_file:
+            json.dump(user_config, user_config_file)
 
 
 @app.command()
