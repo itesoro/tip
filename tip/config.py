@@ -1,4 +1,5 @@
 import os
+import json
 
 
 def get_package_dir(package_name: str, package_version: str) -> str:
@@ -32,14 +33,18 @@ def get_environments_dir() -> str:
 
 
 def get_tip_home() -> str:
-    tip_home = os.getenv('TIP_HOME')
-    if tip_home is None:
-        raise RuntimeError("TIP_HOME environment variable is not set")
-    if not os.path.isdir(tip_home):
-        raise RuntimeError("TIP_HOME is not a directory")
-    return tip_home
+    user_config = _get_user_config()
+    return user_config['home_dir']
 
 
 def get_active_environment_name() -> str | None:
     """Get active environment name if it's set."""
-    return os.getenv("TIP_ACTIVE_ENV", None)
+    user_config = _get_user_config()
+    return user_config['active_environment_name']
+
+
+def _get_user_config():
+    home_dir = os.path.expanduser('~')
+    tiprc_path = os.path.join(home_dir, '.tip')
+    with open(tiprc_path, mode='r') as tiprc_file:
+        return json.load(tiprc_file)
