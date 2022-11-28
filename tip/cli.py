@@ -121,9 +121,12 @@ def create(environment_name: str):
 
 
 @app.command()
-@click.option('--environment_path', '-e', 'environment_path', type=str, help="Path of the environment to add packages to")
 @click.option('--from_path', '-f', 'from_path', type=str, help="Environment to add all packages from")
 @click.argument('package_strings', type=str, nargs=-1)
+@click.option(
+    '--environment_path', '-e', 'environment_path', type=str,
+    help="Path of the environment to add packages to"
+)
 def add(package_strings: tuple[str], environment_path: str, from_path: str):
     """
     Add packages to the environment.
