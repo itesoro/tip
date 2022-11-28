@@ -107,3 +107,4 @@ TODO
 - When adding packages make sure they are not duplicated.
 - TIP based syntax highlighting in VSCode.
 - Maybe prompt can be modified through `sys.ps1; sys.ps2`?
+- Print an error when activating environment that doesn't exist.
