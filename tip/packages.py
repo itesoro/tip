@@ -17,6 +17,19 @@ def install(package_string: str):
     except Exception as ex:
         shutil.rmtree(package_dir)
         raise RuntimeError(f'Error while installing package "{package_string}": "{ex}"')
+    make_link(package_string)
+
+
+def make_link(package_string: str):
+    """Creates link to a package conent within `site-packages` directory."""
+    package_dir = locate(package_string)
+    links_dir = config.get_links_dir()
+    for folder_name in os.listdir(package_dir):
+        folder_path = os.path.join(package_dir, folder_name)
+        link_path = os.path.join(links_dir, folder_name)
+        if os.path.exists(link_path):
+            os.unlink(link_path)
+        os.symlink(folder_path, link_path)
 
 
 def is_installed(package_string: str) -> bool:
