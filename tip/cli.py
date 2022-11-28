@@ -101,24 +101,13 @@ def _run(module_name: str, command: str, environment_path: str, install_missing:
         _install(package_strings)
     packages_to_folders = _map_packages_to_folders(env)
     finder = TipMetaFinder(packages_to_folders)
-    # TODO: check if it's called first
-    # TODO: sys.path = ["site-packages"]
-    # TODO: site-packages = soft links to site-packages/package_name/package_version
+    sys.path.append(config.get_links_dir())
     sys.meta_path.insert(0, finder)
     if is_python_file_path_given:
-        with open('/root/tip/commands.log', mode='a') as log_file:
-            log_file.write('RUN FILE' + '=' * 10 + '\n')
-            log_file.write(python_file_path + '\n')
         _run_file(python_file_path, args)
     elif is_module_name_given:
-        with open('/root/tip/commands.log', mode='a') as log_file:
-            log_file.write('RUN MODULE' + '=' * 10 + '\n')
-            log_file.write(module_name + '\n')
         _run_module(module_name, args)
     else:
-        with open('/root/tip/commands.log', mode='a') as log_file:
-            log_file.write('RUN COMMAND' + '=' * 10 + '\n')
-            log_file.write(command + '\n')
         ns = {}
         exec(command, ns, ns)
 
