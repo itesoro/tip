@@ -15,6 +15,14 @@ def get_packages_dir() -> str:
     return packages_dir
 
 
+def get_links_dir() -> str:
+    tip_home = get_tip_home()
+    links_dir = os.path.join(tip_home, "package-links")
+    if not os.path.isdir(links_dir):
+        os.makedirs(links_dir)
+    return links_dir
+
+
 def get_environments_dir() -> str:
     tip_home = get_tip_home()
     environments_dir = os.path.join(tip_home, "environments")
