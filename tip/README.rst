@@ -7,104 +7,57 @@ to use it in different environments.
 Installation
 ~~~~~~~~~~~~
 
-To install TIP you need to install this package using PIP. After that you want to add shortcut for ``tip.sh`` script:
+Install this package using `pip install`. After that run:
 
 .. code-block:: bash
+    tip init <path-to-tip-home>
 
-    alias tip="source /path/to/tip.sh"
+Value of `path-to-tip-home` must be a path to TIP home (see Glossary).
 
-You will also need to set path where tip will create metadata files and store packages:
+Usage
+~~~~~
 
-.. code-block:: bash
+TIP has several commands:
 
-    export TIP_HOME="path/to/tip/home"
+- `add` new package by it's package string to the current environment (or specify environment using `-e`)
+- `create` create new environment
+- `init` create tip home and user configuration file at `~/.tip`
+- `install` download and install package(-s) so it's can be used within environment
+- `list` print installed packages and their versions
+- `run` is used as `python` command except it uses active environment to import hook packages added into it
+- `uninstall` removes previously installed package(-s)
 
-Basic Usage
-~~~~~~~~~~~
+Show more info using `--help` with `tip` or concrete command.
 
-Before you start installing packages you want to create an environment:
-
-.. code-block:: bash
-
-    tip create my_env
-
-You can activate this environment:
-
-.. code-block:: bash
-
-    tip activate my_env
-
-Add packages to the environment:
-
-.. code-block:: bash
-
-    tip add numpy==1.12.0 pandas==1.5.1
-
-Now you are set to run your script:
-
-.. code-block:: bash
-
-    tip run ./my_script.py
-
-Or a module:
-
-.. code-block:: bash
-
-    tip run -m my_module.app
-
-First time run should be used with option ``--install-missing`` in order to download and install packages added to the
-environment.
-
-Additional Options
+VSCode Integration
 ~~~~~~~~~~~~~~~~~~
 
-Environment by path
-*******************
+In order to use tip with VSCode you must install `tip` and then provide path to `tipr` executable as current
+interpreter. It will use **all installed libraries** in current tip home.
 
-You can explicitly provide path when executing commands.
+Glossary
+~~~~~~~~
 
-Install packages from environment:
+**Package String** - string containing package name and version in format of `<package_name>==<package_version>`.
 
-.. code-block:: bash
+**Environment** - a set of packages with their versions used when running python modules to import hook them. Packages
+are determined by environment file.
 
-    tip install -e=/path/to/environment.json
+**TIP Home** - a directory which contains all installed packages, environment definitions and other system files.
 
-Add packages to the environment:
+**Add Package** - append new package to the environment or update it's version.
 
-.. code-block:: bash
+**Install Package** - download and make importable a `pip` package.
 
-    tip add -e=/path/to/environment.json
-
-Add packages from existing environment:
-
-.. code-block:: bash
-
-    tip add -f=/path/to/environment.json
-
-Run using environment located by path:
-
-.. code-block:: bash
-
-    tip run -e=/path/to/environment.json ./my_script.py
-
-Another commands
-****************
-
-Show all installed packages and their versions:
-
-.. code-block:: bash
-
-    tip list
-
+**Active Environment** - environment which will be used when running `tip run` on a module without specifying concrete
+environment.
 
 TODO
 ~~~~
 
 - Make an installation script, preferably using ``setup.py``.
-- Create default environment in installation script.
 - Uninstall checks if uninstalled packages are in environments and proposes to remove them (maybe that's not necessary).
 - Print current environment name, path and package list.
 - When adding packages make sure they are not duplicated.
-- TIP based syntax highlighting in VSCode.
-- Maybe prompt can be modified through `sys.ps1; sys.ps2`?
 - Print an error when activating environment that doesn't exist.
+- Shouldn't we prohibit addition of packages that are not installed?
