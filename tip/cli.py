@@ -56,6 +56,27 @@ def init(home):
 
 
 @app.command()
+@click.argument('environment_name', type=str)
+def activate(environment_name: str):
+    """Make environment ENVIRONMENT_NAME active."""
+    home_dir = os.path.expanduser('~')
+    user_config_path = os.path.join(home_dir, '.tip')
+    if not os.path.isfile(user_config_path):
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    with open(user_config_path, mode='r') as user_config_file:
+        try:
+            user_config = json.load(user_config_file)
+        except Exception as ex:
+            raise click.ClickException(f"Invalid user configuration file: {ex}")
+    environment_to_activate_path = os.path.join(user_config['home_dir'], "environments", f"{environment_name}.json")
+    if not os.path.exists(environment_to_activate_path):
+        raise click.ClickException(f"Environment {environment_name} not found, create with `tip create`")
+    user_config['active_environment_name'] = environment_name
+    with open(user_config_path, mode='w') as user_config_file:
+        json.dump(user_config, user_config_file)
+
+
+@app.command()
 @click.option('--env', '-e', 'environment_path', type=str)
 @click.argument('package_strings', type=str, nargs=-1)
 def install(package_strings: tuple[str], environment_path: str):
