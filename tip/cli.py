@@ -53,7 +53,7 @@ def init(home):
         user_config['home_dir'] = home
         with open(user_config_path, mode='w') as user_config_file:
             json.dump(user_config, user_config_file)
-
+    
 
 @app.command()
 @click.argument('environment_name', type=str)
@@ -74,6 +74,21 @@ def activate(environment_name: str):
     user_config['active_environment_name'] = environment_name
     with open(user_config_path, mode='w') as user_config_file:
         json.dump(user_config, user_config_file)
+
+
+@app.command()
+def active_env():
+    """Print currently acitve env."""
+    home_dir = os.path.expanduser('~')
+    user_config_path = os.path.join(home_dir, '.tip')
+    if not os.path.isfile(user_config_path):
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    with open(user_config_path, mode='r') as user_config_file:
+        try:
+            user_config = json.load(user_config_file)
+        except Exception as ex:
+            raise click.ClickException(f"Invalid user configuration file: {ex}")
+    click.echo(user_config['active_environment_name'])
 
 
 @app.command()
