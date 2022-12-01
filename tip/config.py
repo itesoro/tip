@@ -3,12 +3,14 @@ import json
 
 
 def get_package_dir(package_name: str, package_version: str) -> str:
+    """Get path to the package by it's name and version."""
     packages_dir = get_packages_dir()
     package_dir = os.path.join(packages_dir, package_name, package_version)
     return package_dir
 
 
 def get_packages_dir() -> str:
+    """Get path to directory containg sources of all installed packages."""
     tip_home = get_tip_home()
     packages_dir = os.path.join(tip_home, "site-packages")
     if not os.path.isdir(packages_dir):
@@ -17,6 +19,7 @@ def get_packages_dir() -> str:
 
 
 def get_links_dir() -> str:
+    """Get path to directory containing links to all installed packages."""
     tip_home = get_tip_home()
     links_dir = os.path.join(tip_home, "package-links")
     if not os.path.isdir(links_dir):
@@ -25,6 +28,7 @@ def get_links_dir() -> str:
 
 
 def get_environments_dir() -> str:
+    """Get path to the directory containing environment files."""
     tip_home = get_tip_home()
     environments_dir = os.path.join(tip_home, "environments")
     if not os.path.isdir(environments_dir):
@@ -33,18 +37,37 @@ def get_environments_dir() -> str:
 
 
 def get_tip_home() -> str:
-    user_config = _get_user_config()
-    return user_config['home_dir']
+    """Get path to tip home directory."""
+    return get_user_config()['home_dir']
 
 
 def get_active_environment_name() -> str | None:
     """Get active environment name if it's set."""
-    user_config = _get_user_config()
-    return user_config['active_environment_name']
+    return get_user_config()['active_environment_name']
 
 
-def _get_user_config():
+def get_user_config():
+    """Get user config."""
+    with open(get_config_path(), mode='r') as user_config_file:
+        return json.load(user_config_file)
+
+
+def create_user_config(active_environment_name: str, tip_home: str):
+    """Create (or overwrite if exists) user config file."""
+    user_config = {
+        'active_environment_name': active_environment_name,
+        'home_dir': tip_home,
+    }
+    with open(get_config_path(), mode='w') as user_config_file:
+        json.dump(user_config, user_config_file)
+
+
+def exists() -> bool:
+    """Check if config file exists."""
+    return os.path.isfile(get_config_path())
+
+
+def get_config_path():
+    """Get path to the user config file."""
     home_dir = os.path.expanduser('~')
-    tiprc_path = os.path.join(home_dir, '.tip')
-    with open(tiprc_path, mode='r') as tiprc_file:
-        return json.load(tiprc_file)
+    return os.path.join(home_dir, '.tip')
