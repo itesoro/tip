@@ -52,7 +52,7 @@ def get_user_config():
         return json.load(user_config_file)
 
 
-def create_user_config(active_environment_name: str, tip_home: str):
+def update(active_environment_name: str, tip_home: str):
     """Create (or overwrite if exists) user config file."""
     user_config = {
         'active_environment_name': active_environment_name,
