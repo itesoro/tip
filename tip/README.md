@@ -51,3 +51,10 @@ environment.
 ## TODO
 
 - When adding packages make sure they are not duplicated.
+
+## Known Issues
+
+- Because of packages links we may reach packages that are not part of current environemnt but are part of other env
+- `tip run -m module` error message when there is no `__main__.py` file may have better formatting
+- Uninstalling a package doesn't remove link: we must not just delete it but add link to other package version if it
+exists
