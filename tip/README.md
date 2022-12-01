@@ -50,7 +50,4 @@ environment.
 
 ## TODO
 
-- Uninstall checks if uninstalled packages are in environments and proposes to remove them (maybe that's not necessary).
 - When adding packages make sure they are not duplicated.
-- Print an error when activating environment that doesn't exist.
-- Shouldn't we prohibit addition of packages that are not installed?
