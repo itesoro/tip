@@ -12,10 +12,27 @@ def get_active_environment() -> dict | None:
     if (active_environment := config.get_active_environment_name()) is None:
         return None
     environment_path = os.path.join(environments_dir, active_environment + '.json')
-    return get_environment(environment_path)
+    return get_environment_by_path(environment_path)
 
 
-def get_environment(path: str) -> dict:
+def exists(name: str) -> bool:
+    """Check if file of the environment called `name` exists."""
+    path = get_environment_path(name)
+    return os.path.isfile(path)
+
+
+def get_environment_by_name(name: str) -> dict:
+    """Get package list of the environment called `name`"""
+    path = get_environment_path(name)
+    return get_environment_by_path(path)
+
+
+def get_environment_path(name: str) -> str:
+    """Find file of the environment called `name`."""
+    return os.path.join(config.get_environments_dir(), f"{name}.json")
+
+
+def get_environment_by_path(path: str) -> dict:
     """Get package list of the environment at `path`."""
     if not os.path.isfile(path):
         raise FileNotFoundError(f"Environment file is not found at {path}")
@@ -30,7 +47,7 @@ def add_to_environment(package: str, path: str | None, replace: bool = False):
     """Add package to the environment file at `path` or into active environment."""
     if path is None:
         path = os.path.join(config.get_environments_dir(), config.get_active_environment_name() + '.json')
-    environment = get_environment(path)
+    environment = get_environment_by_path(path)
     package_name, package_version = packages.parse(package)
     if (curr_version := environment.get(package_name)) is not None and not replace:
         if curr_version == package_version:
