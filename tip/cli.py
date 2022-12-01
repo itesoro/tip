@@ -31,19 +31,17 @@ def init(home):
         os.makedirs(home)
     else:
         click.echo('Home directory already exists')
-    user_home_dir = os.path.expanduser('~')
-    user_config_path = os.path.join(user_home_dir, '.tip')
+    user_config_path = config.get_config_path()
     if os.path.isdir(user_config_path):
         raise click.ClickException(f"{user_config_path} must be a file, found directory")
-    if not os.path.exists(user_config_path):
+    if not config.exists():
         base_environment_path = os.path.join(home, "environments", "base.json")
         if not os.path.exists(base_environment_path):
             environment.create_environment_file({}, base_environment_path)
-        with open(user_config_path, mode='w') as user_config_file:
-            json.dump({
-                'home_dir': home,
-                'active_environment_name': 'base',
-            }, user_config_file)
+        config.update(
+            active_environment_name='base',
+            tip_home=home
+        )
     else:
         with open(user_config_path, mode='r') as user_config_file:
             try:
@@ -59,36 +57,30 @@ def init(home):
 @click.argument('environment_name', type=str)
 def activate(environment_name: str):
     """Make environment ENVIRONMENT_NAME active."""
-    home_dir = os.path.expanduser('~')
-    user_config_path = os.path.join(home_dir, '.tip')
-    if not os.path.isfile(user_config_path):
+    if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
-    with open(user_config_path, mode='r') as user_config_file:
-        try:
-            user_config = json.load(user_config_file)
-        except Exception as ex:
-            raise click.ClickException(f"Invalid user configuration file: {ex}")
-    environment_to_activate_path = os.path.join(user_config['home_dir'], "environments", f"{environment_name}.json")
-    if not os.path.exists(environment_to_activate_path):
+    try:
+        user_config = config.get_user_config()
+    except Exception as ex:
+        raise click.ClickException(f"User Config is invalid: {ex}")
+    if not environment.exists(environment_name):
         raise click.ClickException(f"Environment {environment_name} not found, create with `tip create`")
-    user_config['active_environment_name'] = environment_name
-    with open(user_config_path, mode='w') as user_config_file:
-        json.dump(user_config, user_config_file)
+    config.update(
+        active_environment_name=environment_name,
+        tip_home=user_config['home_dir']
+    )
 
 
 @app.command()
 def active_env():
     """Print currently acitve env."""
-    home_dir = os.path.expanduser('~')
-    user_config_path = os.path.join(home_dir, '.tip')
-    if not os.path.isfile(user_config_path):
+    if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
-    with open(user_config_path, mode='r') as user_config_file:
-        try:
-            user_config = json.load(user_config_file)
-        except Exception as ex:
-            raise click.ClickException(f"Invalid user configuration file: {ex}")
-    click.echo(user_config['active_environment_name'])
+    try:
+        user_config = config.get_user_config()
+        click.echo(user_config['active_environment_name'])
+    except Exception as ex:
+        raise click.ClickException(f"Invalid user configuration file: {ex}")
 
 
 @app.command()
@@ -102,6 +94,8 @@ def install(package_strings: tuple[str], environment_path: str):
     make sure you have set the TIP_HOME environment variable. It must contain an absolute path to a folder where the
     packages will be downloaded.
     """
+    if not config.exists():
+        raise click.ClickException("No user configuration found, run `tip init` first")
     _install(package_strings, environment_path)
 
 
@@ -128,6 +122,8 @@ def list_():
     """
     Show installed packages.
     """
+    if not config.exists():
+        raise click.ClickException("No user configuration found, run `tip init` first")
     site_packages_path = config.get_packages_dir()
     tree = rich.tree.Tree(site_packages_path)
     package_names = os.listdir(site_packages_path)
@@ -152,43 +148,17 @@ def run(module_name: str, command: str, environment_path: str, install_missing: 
 
     In order to use environment all packages must be installed.
     """
+    if not config.exists():
+        raise click.ClickException("No user configuration found, run `tip init` first")
     return _run(module_name, command, environment_path, install_missing, args)
-
-
-def _run(module_name: str, command: str, environment_path: str, install_missing: bool, args: tuple[str]):
-    is_module_name_given = isinstance(module_name, str) and len(module_name) > 0
-    is_command_given = isinstance(command, str) and len(command) > 0
-    is_python_file_path_given = not (is_module_name_given or is_command_given) and len(args) > 0
-    if not (is_module_name_given or is_python_file_path_given or is_command_given):
-        raise click.ClickException("One of --module, python_file_path or -c must be given")
-    if is_python_file_path_given:
-        python_file_path = args[0]
-    if environment_path:
-        env = environment.get_environment(environment_path)
-    else:
-        env = environment.get_active_environment()
-    if env is None:
-        raise click.ClickException("Activate environment or provide environment path using `--env`")
-    if install_missing:
-        package_strings = [f"{name}=={version}" for name, version in env.items()]
-        _install(package_strings)
-    packages_to_folders = _map_packages_to_folders(env)
-    finder = TipMetaFinder(packages_to_folders)
-    sys.path.append(config.get_links_dir())
-    sys.meta_path.insert(0, finder)
-    if is_python_file_path_given:
-        _run_file(python_file_path, args)
-    elif is_module_name_given:
-        _run_module(module_name, args)
-    else:
-        ns = {}
-        exec(command, ns, ns)
 
 
 @app.command()
 @click.argument('environment_name', type=str)
 def create(environment_name: str):
     """Create new environment."""
+    if not config.exists():
+        raise click.ClickException("No user configuration found, run `tip init` first")
     path = os.path.join(config.get_environments_dir(), environment_name + '.json')
     environment.create_environment_file(None, path)
 
@@ -209,13 +179,43 @@ def add(package_strings: tuple[str], environment_path: str, from_path: str):
     """
     packages_to_add = []
     if from_path:
-        env = environment.get_environment(from_path)
+        env = environment.get_environment_by_path(from_path)
         for package_name, package_version in env.items():
             packages_to_add.append(f"{package_name}=={package_version}")
     packages_to_add.extend(package_strings)
     maybe_environment_path = environment_path if environment_path else None
     for package_string in packages_to_add:
         environment.add_to_environment(package_string, path=maybe_environment_path, replace=True)
+
+
+def _run(module_name: str, command: str, environment_path: str, install_missing: bool, args: tuple[str]):
+    is_module_name_given = isinstance(module_name, str) and len(module_name) > 0
+    is_command_given = isinstance(command, str) and len(command) > 0
+    is_python_file_path_given = not (is_module_name_given or is_command_given) and len(args) > 0
+    if not (is_module_name_given or is_python_file_path_given or is_command_given):
+        raise click.ClickException("One of --module, python_file_path or -c must be given")
+    if is_python_file_path_given:
+        python_file_path = args[0]
+    if environment_path:
+        env = environment.get_environment_by_path(environment_path)
+    else:
+        env = environment.get_active_environment()
+    if env is None:
+        raise click.ClickException("Activate environment or provide environment path using `--env`")
+    if install_missing:
+        package_strings = [f"{name}=={version}" for name, version in env.items()]
+        _install(package_strings)
+    packages_to_folders = _map_packages_to_folders(env)
+    finder = TipMetaFinder(packages_to_folders)
+    sys.path.append(config.get_links_dir())
+    sys.meta_path.insert(0, finder)
+    if is_python_file_path_given:
+        _run_file(python_file_path, args)
+    elif is_module_name_given:
+        _run_module(module_name, args)
+    else:
+        ns = {}
+        exec(command, ns, ns)
 
 
 def _run_module(name: str, args):
@@ -246,7 +246,7 @@ def _install(package_strings: tuple[str], environment_path: str = None):
             continue
         raise click.ClickException("Invalid package string: '%s'", package_string)
     if environment_path is not None:
-        env = environment.get_environment(environment_path)
+        env = environment.get_environment_by_path(environment_path)
         env_package_strings = [f"{name}=={version}" for name, version in env.items()]
     else:
         env_package_strings = []
