@@ -50,7 +50,8 @@ environment.
 
 ## TODO
 
-- When adding packages make sure they are not duplicated.
+- When adding packages make sure they are not duplicated
+- `tipr` calls REPL
 
 ## Known Issues
 
