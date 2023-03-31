@@ -1,5 +1,6 @@
 import os
 import sys
+import code
 import json
 import importlib
 import contextlib
@@ -36,6 +37,7 @@ def init(home):
         raise click.ClickException(f"{user_config_path} must be a file, found directory")
     if not config.exists():
         base_environment_path = os.path.join(home, "environments", "base.json")
+        os.makedirs(os.path.dirname(base_environment_path), exist_ok=True)
         if not os.path.exists(base_environment_path):
             environment.create_environment_file({}, base_environment_path)
         config.update(
@@ -192,8 +194,6 @@ def _run(module_name: str, command: str, environment_path: str, install_missing:
     is_module_name_given = isinstance(module_name, str) and len(module_name) > 0
     is_command_given = isinstance(command, str) and len(command) > 0
     is_python_file_path_given = not (is_module_name_given or is_command_given) and len(args) > 0
-    if not (is_module_name_given or is_python_file_path_given or is_command_given):
-        raise click.ClickException("One of --module, python_file_path or -c must be given")
     if is_python_file_path_given:
         python_file_path = args[0]
     if environment_path:
@@ -213,9 +213,11 @@ def _run(module_name: str, command: str, environment_path: str, install_missing:
         _run_file(python_file_path, args)
     elif is_module_name_given:
         _run_module(module_name, args)
-    else:
+    elif is_command_given:
         ns = {}
         exec(command, ns, ns)
+    else:
+        code.InteractiveConsole(locals=globals()).interact()
 
 
 def _run_module(name: str, args):
@@ -250,8 +252,7 @@ def _install(package_strings: tuple[str], environment_path: str = None):
         env_package_strings = [f"{name}=={version}" for name, version in env.items()]
     else:
         env_package_strings = []
-    package_strings = list(package_strings)
-    package_strings.extend(env_package_strings)
+    package_strings = list(package_strings) + env_package_strings
     for package_string in package_strings:
         packages.install(package_string)
 
