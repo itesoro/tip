@@ -1,7 +1,7 @@
 # Tesoro Installer of Packages
 
-**TIP** (Tesoro Installer of Packages) is a package manager built around PIP. It allows to keep only one copy of a package
-to use it in different environments.
+**TIP** (Tesoro Installer of Packages) is a package manager built around PIP. It allows to keep only one copy of a
+package to use it in different environments.
 
 ## Installation
 
@@ -51,7 +51,12 @@ environment.
 ## TODO
 
 - When adding packages make sure they are not duplicated
-- `tipr` calls REPL
+- `tip install package` without package_version (use latest)
+- `tip add package` without package_version (use latest)
+- Install our libraries:
+    - Like `pip install`
+    - Like `pip install -e`
+- Dependencies of the installed packages may be already installed, avoid their duplication
 
 ## Known Issues
 
