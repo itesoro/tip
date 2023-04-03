@@ -162,7 +162,10 @@ def create(environment_name: str):
     if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
     path = os.path.join(config.get_environments_dir(), environment_name + '.json')
-    environment.create_environment_file(None, path)
+    try:
+        environment.create_environment_file(None, path)
+    except RuntimeError as ex:
+        raise click.ClickException(ex)
 
 
 @app.command()
