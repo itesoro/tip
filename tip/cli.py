@@ -1,17 +1,11 @@
 import os
-import sys
-import code
 import json
-import importlib
-import contextlib
-from importlib.util import module_from_spec, spec_from_file_location
 
 import rich
-import rich.tree
 import click
+import rich.tree
 
-from tip import config, environment, packages
-from tip.tip_meta_finder import TipMetaFinder
+from tip import config, environment, packages, tipr
 
 
 @click.group()
@@ -98,7 +92,7 @@ def install(package_strings: tuple[str], environment_path: str):
     """
     if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
-    _install(package_strings, environment_path)
+    packages.install(package_strings, environment_path)
 
 
 @app.command()
@@ -120,17 +114,42 @@ def uninstall(package_strings: tuple[str]):
 
 
 @app.command(name='list')
-def list_():
+@click.option('--active-env', '-a', 'is_active_env', is_flag=True)
+@click.argument("environment_name_or_path", type=str, required=False)
+def list_(is_active_env: bool, environment_name_or_path: str | None = None):
     """
-    Show installed packages.
+    Show added or installed packages.
+
+    If IS_ACTIVE_ENV is set, display packages from the active environment. If the ENVIRONMENT option is specified,
+    display packages from the chosen environment. Otherwise, display all packages for the current TIP installation.
     """
+    if is_active_env and environment_name_or_path is not None:
+        raise click.ClickException("Only one of ACTIVE_ENV or ENVIRONMENT_PATH should be specified")
     if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
-    site_packages_path = config.get_packages_dir()
-    tree = rich.tree.Tree(site_packages_path)
-    package_names = os.listdir(site_packages_path)
-    for package_name in package_names:
-        package_versions = sorted(os.listdir(os.path.join(site_packages_path, package_name)))
+    packages_info = {}
+    if environment_name_or_path is None and is_active_env == False:
+        site_packages_path = config.get_packages_dir()
+        tree = rich.tree.Tree(site_packages_path)
+        package_names = os.listdir(site_packages_path)
+        for package_name in package_names:
+            package_versions = sorted(os.listdir(os.path.join(site_packages_path, package_name)))
+            packages_info[package_name] = package_versions
+    else:
+        if is_active_env:
+            tree = rich.tree.Tree(config.get_active_environment_name())
+            packages_info = environment.get_active_environment()
+        else:
+            tree = rich.tree.Tree(environment_name_or_path)
+            try:
+                packages_info = environment.get_environment_by_name(environment_name_or_path)
+            except FileNotFoundError:
+                packages_info = environment.get_environment_by_path(environment_name_or_path)
+        packages_info = {k: [v] for k, v in packages_info.items()}
+    if len(packages_info) == 0:
+        click.echo("No packages found!")
+        return
+    for package_name, package_versions in packages_info.items():
         if len(package_versions) > 0:
             package_tree = tree.add(f"📦 {package_name}")
         for package_version in package_versions:
@@ -152,7 +171,7 @@ def run(module_name: str, command: str, environment_path: str, install_missing: 
     """
     if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
-    return _run(module_name, command, environment_path, install_missing, args)
+    return tipr.run(module_name, command, environment_path, install_missing, args)
 
 
 @app.command()
@@ -193,98 +212,22 @@ def add(package_strings: tuple[str], environment_path: str, from_path: str):
         environment.add_to_environment(package_string, path=maybe_environment_path, replace=True)
 
 
-def _run(module_name: str, command: str, environment_path: str, install_missing: bool, args: tuple[str]):
-    is_module_name_given = isinstance(module_name, str) and len(module_name) > 0
-    is_command_given = isinstance(command, str) and len(command) > 0
-    is_python_file_path_given = not (is_module_name_given or is_command_given) and len(args) > 0
-    if is_python_file_path_given:
-        python_file_path = args[0]
-    if environment_path:
-        env = environment.get_environment_by_path(environment_path)
-    else:
-        env = environment.get_active_environment()
-    if env is None:
-        raise click.ClickException("Activate environment or provide environment path using `--env`")
-    if install_missing:
-        package_strings = [f"{name}=={version}" for name, version in env.items()]
-        _install(package_strings)
-    packages_to_folders = _map_packages_to_folders(env)
-    finder = TipMetaFinder(packages_to_folders)
-    sys.path.append(config.get_links_dir())
-    sys.meta_path.insert(0, finder)
-    if is_python_file_path_given:
-        _run_file(python_file_path, args)
-    elif is_module_name_given:
-        _run_module(module_name, args)
-    elif is_command_given:
-        ns = {}
-        exec(command, ns, ns)
-    else:
-        code.InteractiveConsole(locals=globals()).interact()
+@app.command()
+@click.argument('package_strings', type=str, nargs=-1)
+@click.option('--environment_path', '-e', 'environment_path', type=str)
+def remove(package_strings: tuple[str], environment_path: str | None = None):
+    """
+    Remove packages from the environment.
 
-
-def _run_module(name: str, args):
-    module_name = "__main__"
-    with _disable_pycache():
-        module = importlib.import_module(name)
-        main_path = os.path.join(module.__path__[0], "__main__.py")
-        sys.argv = [main_path] + list(args)
-        main_spec = spec_from_file_location(module_name, main_path)
-        main_module = module_from_spec(main_spec)
-        sys.modules[module_name] = main_module
-        main_spec.loader.exec_module(main_module)
-
-
-def _run_file(filename: str, args):
-    module_name = "__main__"
-    sys.argv = list(args)
-    spec = spec_from_file_location(module_name, filename)
-    with _disable_pycache():
-        module_to_run = module_from_spec(spec)
-        sys.modules[module_name] = module_to_run
-        spec.loader.exec_module(module_to_run)
-
-
-def _install(package_strings: tuple[str], environment_path: str = None):
+    If ENVIRONMENT_PATH is specified, then packages are removed from it, otherwise activated environment is affected.
+    """
     for package_string in package_strings:
-        if packages.is_valid(package_string):
-            continue
-        raise click.ClickException("Invalid package string: '%s'", package_string)
-    if environment_path is not None:
-        env = environment.get_environment_by_path(environment_path)
-        env_package_strings = [f"{name}=={version}" for name, version in env.items()]
-    else:
-        env_package_strings = []
-    package_strings = list(package_strings) + env_package_strings
-    for package_string in package_strings:
-        packages.install(package_string)
-
-
-@contextlib.contextmanager
-def _disable_pycache():
-    old_dont_write_bytecode = sys.dont_write_bytecode
-    sys.dont_write_bytecode = True
-    try:
-        yield
-    finally:
-        sys.dont_write_bytecode = old_dont_write_bytecode
-
-
-def _map_packages_to_folders(env: dict) -> dict:
-    packages_to_folders = {}
-    for package_name, package_version in env.items():
-        package_dir = packages.locate(f"{package_name}=={package_version}")
-        if not os.path.isdir(package_dir):
-            raise click.ClickException(f"Package '{package_name}=={package_version}' is not installed")
-        package_files = os.listdir(package_dir)
-        package_subpackages = [entry.removesuffix('.py') for entry in package_files
-                               if _is_package_or_module(os.path.join(package_dir, entry))]
-        for subpackage in package_subpackages:
-            packages_to_folders[subpackage] = package_dir
-    return packages_to_folders
-
-
-def _is_package_or_module(name: str) -> bool:
-    is_package = os.path.exists(os.path.join(name, '__init__.py'))
-    is_module = name.endswith('.py')
-    return is_package or is_module
+        try:
+            environment.remove_from_environment(package_string, path=environment_path)
+        except KeyError as ex:
+            click.echo("Package {ex} not in environment".format(ex=ex))
+        except ValueError as ex:
+            click.echo("Specified version {package_string} not found, current version: {ex}".format(
+                package_string=package_string,
+                ex=ex
+            ))
