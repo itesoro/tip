@@ -57,6 +57,20 @@ def add_to_environment(package: str, path: str | None, replace: bool = False):
     return create_environment_file(environment, path, replace=True)
 
 
+def remove_from_environment(package: str, path: str | None):
+    """Remove package from the environment file at `path` or from active environment."""
+    if path is None:
+        path = os.path.join(config.get_environments_dir(), config.get_active_environment_name() + '.json')
+    environment = get_environment_by_path(path)
+    package_name, package_version = packages.parse(package)
+    if package_name not in environment:
+        raise KeyError(package_name)
+    if environment[package_name] != package_version:
+        raise ValueError(package_version)
+    del environment[package_name]
+    return create_environment_file(environment, path, replace=True)
+
+
 def missing_packages(environment: dict) -> list[str]:
     """Get list of not yet installed packages for environment."""
     missing_packages = []
