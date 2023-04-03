@@ -92,7 +92,10 @@ def install(package_strings: tuple[str], environment_path: str):
     """
     if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
-    packages.install(package_strings, environment_path)
+    try:
+        packages.install(package_strings, environment_path)
+    except Exception as ex:
+        raise click.ClickException(ex)
 
 
 @app.command()

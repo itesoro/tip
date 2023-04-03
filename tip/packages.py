@@ -2,8 +2,6 @@ import os
 import shutil
 import subprocess
 
-import click
-
 from tip import config, environment
 
 
@@ -14,7 +12,7 @@ def install(package_strings: tuple[str] | None = None, environment_path: str = N
     for package_string in package_strings:
         if is_valid(package_string):
             continue
-        raise click.ClickException("Invalid package string: '{package_string}'".format(package_string=package_string))
+        raise RuntimeError("Invalid package string: '{package_string}'".format(package_string=package_string))
     if environment_path is not None:
         env = environment.get_environment_by_path(environment_path)
         env_package_strings = [f"{name}=={version}" for name, version in env.items()]
