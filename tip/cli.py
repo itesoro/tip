@@ -179,8 +179,8 @@ def add(package_strings: tuple[str], environment_path: str, from_path: str):
     """
     Add packages to the environment.
 
-    If ENVIRONMENT_PATH is specified, then packages are added to that environment, otherwise activated environment is
-    used. If FROM_PATH is specified, then all packages from that environment are also added to the target environment.
+    If ENVIRONMENT_PATH is specified, then packages are added to it, otherwise activated environment is affected. If
+    FROM_PATH is specified, then all its packages are also added to the target environment.
     """
     packages_to_add = []
     if from_path:
