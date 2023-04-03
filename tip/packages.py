@@ -2,22 +2,27 @@ import os
 import shutil
 import subprocess
 
-from . import config
+import click
+
+from tip import config, environment
 
 
-def install(package_string: str):
-    """Install new package identified by `package_string` to make it available for environments."""
-    package_dir = locate(package_string)
-    if os.path.exists(package_dir):
-        return
-    os.makedirs(package_dir)
-    command = f"pip install --target={package_dir} {package_string}"
-    try:
-        subprocess.check_output(command, shell=True)
-    except Exception as ex:
-        shutil.rmtree(package_dir)
-        raise RuntimeError(f'Error while installing package "{package_string}": "{ex}"')
-    make_link(package_string)
+def install(package_strings: tuple[str] | None = None, environment_path: str = None):
+    """Install packages from `package_strings` and/or from environment."""
+    if package_strings is None:
+        package_strings = []
+    for package_string in package_strings:
+        if is_valid(package_string):
+            continue
+        raise click.ClickException("Invalid package string: '{package_string}'".format(package_string=package_string))
+    if environment_path is not None:
+        env = environment.get_environment_by_path(environment_path)
+        env_package_strings = [f"{name}=={version}" for name, version in env.items()]
+    else:
+        env_package_strings = []
+    package_strings = list(package_strings) + env_package_strings
+    for package_string in package_strings:
+        _install(package_string)
 
 
 def make_link(package_string: str):
@@ -73,3 +78,20 @@ def is_valid(package_string: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def _install(package_string: str):
+    """Install new package identified by `package_string` to make it available for environments."""
+    package_dir = locate(package_string)
+    if os.path.exists(package_dir):
+        return
+    os.makedirs(package_dir)
+    command = f"pip install --target={package_dir} {package_string}"
+    try:
+        subprocess.check_output(command, shell=True)
+    except Exception as ex:
+        shutil.rmtree(package_dir)
+        raise RuntimeError("Error while installing package '{package_string}'".format(
+            package_string
+        )) from ex
+    make_link(package_string)
