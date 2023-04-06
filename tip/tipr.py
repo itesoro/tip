@@ -19,10 +19,10 @@ from tip.tip_meta_finder import TipMetaFinder
 @click.argument('args', nargs=-1, type=click.UNPROCESSED)
 def tipr(module_name: str, command: str, environment_path: str, install_missing: bool, args: tuple[str]):
     """
-    Run module/file/command when all packages installed via tip are visible.
+    Run a module, file, or command with access to all packages installed in the current TIP installation.
 
-    The common use case of this utility is as a VSCode interpreter. Instead of creating multiple executables for each
-    environment there is a single one which sees all the packages.
+    The common use case for this utility is as a VSCode interpreter. Instead of creating multiple executables for each
+    environment, this single utility can access all the packages.
     """
     sys.path.append(config.get_links_dir())
     return run(module_name, command, environment_path, install_missing, args)
