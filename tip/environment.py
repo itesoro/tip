@@ -36,11 +36,8 @@ def get_environment_by_path(path: str) -> dict:
     """Get package list of the environment at `path`."""
     if not os.path.isfile(path):
         raise FileNotFoundError(f"Environment file is not found at {path}")
-    with open(path, mode='r') as environment_file:
-        try:
-            return json.load(environment_file)
-        except Exception:
-            raise RuntimeError("Environment file is corrupted")
+    with open(path, mode='r', encoding='utf8') as environment_file:
+        return json.load(environment_file)
 
 
 def add_to_environment(package: str, path: str | None, replace: bool = False):
@@ -52,9 +49,9 @@ def add_to_environment(package: str, path: str | None, replace: bool = False):
     if (curr_version := environment.get(package_name)) is not None and not replace:
         if curr_version == package_version:
             return
-        raise RuntimeError("Package %s is already in environment and has version %s", package_name, curr_version)
+        raise RuntimeError(f"Package {package_name} is already in environment and has version {curr_version}")
     environment[package_name] = package_version
-    return create_environment_file(environment, path, replace=True)
+    create_environment_file(environment, path, replace=True)
 
 
 def remove_from_environment(package: str, path: str | None):
@@ -68,16 +65,16 @@ def remove_from_environment(package: str, path: str | None):
     if environment[package_name] != package_version:
         raise ValueError(package_version)
     del environment[package_name]
-    return create_environment_file(environment, path, replace=True)
+    create_environment_file(environment, path, replace=True)
 
 
 def missing_packages(environment: dict) -> list[str]:
     """Get list of not yet installed packages for environment."""
     missing_packages = []
     for package_name, package_version in environment.items():
-        package_string = packages.make_package_string(package_name, package_version)
-        if not packages.is_installed(package_string):
-            missing_packages.append(package_string)
+        package_specifier = packages.make_package_specifier(package_name, package_version)
+        if not packages.is_installed(package_specifier):
+            missing_packages.append(package_specifier)
     return missing_packages
 
 
@@ -85,7 +82,7 @@ def create_environment_file(environment: dict | None, path: str, /, *, replace: 
     """Create new environment files at `path` or `$TIP_HOME/environments`, add `packages` to it if they are given."""
     if os.path.isfile(path) and not replace:
         raise RuntimeError("Environment file exists and asked not to replace")
-    with open(path, mode='w+') as environment_file:
+    with open(path, mode='w+', encoding='utf8') as environment_file:
         json.dump({} if environment is None else environment, environment_file)
 
 

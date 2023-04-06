@@ -1,10 +1,11 @@
 import os
 import sys
 import code
-import click
 import importlib
 import contextlib
 from importlib.util import module_from_spec, spec_from_file_location
+
+import click
 
 from tip import config, environment, packages
 from tip.tip_meta_finder import TipMetaFinder
@@ -17,6 +18,13 @@ from tip.tip_meta_finder import TipMetaFinder
 @click.option('--install-missing', 'install_missing', is_flag=True)
 @click.argument('args', nargs=-1, type=click.UNPROCESSED)
 def tipr(module_name: str, command: str, environment_path: str, install_missing: bool, args: tuple[str]):
+    """
+    Run module/file/command when all packages installed via tip are visible.
+
+    The common use case of this utility is as a VSCode interpreter. Instead of creating multiple executables for each
+    environment there is a single one which sees all the packages.
+    """
+    sys.path.append(config.get_links_dir())
     return run(module_name, command, environment_path, install_missing, args)
 
 
@@ -33,11 +41,10 @@ def run(module_name: str, command: str, environment_path: str, install_missing: 
     if env is None:
         raise click.ClickException("Activate environment or provide environment path using `--env`")
     if install_missing:
-        package_strings = [f"{name}=={version}" for name, version in env.items()]
-        packages.install(package_strings)
+        package_specifiers = [f"{name}=={version}" for name, version in env.items()]
+        packages.install(package_specifiers)
     packages_to_folders = _map_packages_to_folders(env)
     finder = TipMetaFinder(packages_to_folders)
-    sys.path.append(config.get_links_dir())
     sys.meta_path.insert(0, finder)
     _remove_external_imports()
     if is_python_file_path_given:

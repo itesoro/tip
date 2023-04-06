@@ -1,7 +1,7 @@
 # Tesoro Installer of Packages
 
 **TIP** (Tesoro Installer of Packages) is a package manager built around PIP. It allows to keep only one copy of a
-package to use it in different environments.
+package and to use it in different environments.
 
 ## Installation
 
@@ -17,7 +17,7 @@ Value of `path-to-tip-home` must be a path to TIP home (see Glossary).
 
 TIP has several commands:
 
-- `add` new package by it's package string to the current environment (or specify environment using `-e`)
+- `add` new package by it's package specifier to the current environment (or specify environment using `-e`)
 - `create` create new environment
 - `init` create tip home and user configuration file at `~/.tip`
 - `install` download and install package(-s) so it's can be used within environment
@@ -30,11 +30,11 @@ Show more info using `--help` with `tip` or concrete command.
 ## VSCode Integration
 
 In order to use tip with VSCode you must install `tip` and then provide path to `tipr` executable as current
-interpreter. It will use **all installed libraries** in current tip home.
+interpreter. It will use **all installed libraries** in current tip home. Read more in `tipr --help`.
 
 ## Glossary
 
-**Package String** - string containing package name and version in format of `<package_name>==<package_version>`.
+**Package Specifier** - package name and version in format of `<package_name>==<package_version>`.
 
 **Environment** - a set of packages with their versions used when running python modules to import hook them. Packages
 are determined by environment file.

@@ -1,8 +1,8 @@
 import os
 import json
 
-import rich
 import click
+import rich
 import rich.tree
 
 from tip import config, environment, packages, tipr
@@ -11,43 +11,46 @@ from tip import config, environment, packages, tipr
 @click.group()
 def app():
     """TIP package manager."""
-    pass
+    try:
+        config.load_config()
+    except FileNotFoundError:
+        pass
 
 
 @app.command()
-@click.argument('home', type=str)
-def init(home):
+@click.argument('home_dir', type=str)
+def init(home_dir):
     """
     Initialize user configuration file and tip home folder at HOME.
     """
-    if os.path.isfile(home):
-        raise click.ClickException(f"{home} is a file")
-    if not os.path.exists(home):
-        os.makedirs(home)
+    if os.path.isfile(home_dir):
+        raise click.ClickException(f"{home_dir} is a file")
+    if not os.path.exists(home_dir):
+        os.makedirs(home_dir)
     else:
         click.echo('Home directory already exists')
     user_config_path = config.get_config_path()
     if os.path.isdir(user_config_path):
         raise click.ClickException(f"{user_config_path} must be a file, found directory")
     if not config.exists():
-        base_environment_path = os.path.join(home, "environments", "base.json")
+        base_environment_path = os.path.join(home_dir, "environments", "base.json")
         os.makedirs(os.path.dirname(base_environment_path), exist_ok=True)
         if not os.path.exists(base_environment_path):
             environment.create_environment_file({}, base_environment_path)
         config.update(
             active_environment_name='base',
-            tip_home=home
+            tip_home=home_dir
         )
     else:
-        with open(user_config_path, mode='r') as user_config_file:
+        with open(user_config_path, mode='r', encoding='utf8') as user_config_file:
             try:
                 user_config = json.load(user_config_file)
             except Exception as ex:
                 raise click.ClickException(f"Invalid user configuration file: {ex}")
-        user_config['home_dir'] = home
-        with open(user_config_path, mode='w') as user_config_file:
+        user_config['home_dir'] = home_dir
+        with open(user_config_path, mode='w', encoding='utf8') as user_config_file:
             json.dump(user_config, user_config_file)
-    
+
 
 @app.command()
 @click.argument('environment_name', type=str)
@@ -68,52 +71,55 @@ def activate(environment_name: str):
 
 
 @app.command()
-def active_env():
-    """Print currently acitve env."""
+def info():
+    """Display information about current tip environment."""
     if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
-    try:
-        user_config = config.get_user_config()
-        click.echo(user_config['active_environment_name'])
-    except Exception as ex:
-        raise click.ClickException(f"Invalid user configuration file: {ex}")
+    tip_home = config.get_tip_home()
+    active_env_name = config.get_active_environment_name()
+    active_env_path = environment.get_environment_path(active_env_name)
+    click.echo(f"active env: {active_env_name}")
+    click.echo(f"active env location: {active_env_path}")
+    click.echo(f"home directory: {tip_home}")
 
 
 @app.command()
 @click.option('--env', '-e', 'environment_path', type=str)
-@click.argument('package_strings', type=str, nargs=-1)
-def install(package_strings: tuple[str], environment_path: str):
+@click.argument('package_specifiers', type=str, nargs=-1)
+def install(package_specifiers: tuple[str], environment_path: str):
     """
-    Download and install packages by PACKAGE_STRINGS to make them runnable with `tip run`.
+    Download and install packages by PACKAGE_SPECIFIERS to make them runnable with `tip run`.
 
-    PACKAGE_STRINGS is an array of package strings "<package_name>==<package_version>". In order to run this command
-    make sure you have set the TIP_HOME environment variable. It must contain an absolute path to a folder where the
-    packages will be downloaded.
+    PACKAGE_SPECIFIERS is an array of package specifiers "<package_name>==<package_version>". In order to run this
+    command make sure you have set the TIP_HOME environment variable. It must contain an absolute path to a folder where
+    the packages will be downloaded.
     """
     if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
     try:
-        packages.install(package_strings, environment_path)
+        packages.install(package_specifiers, environment_path)
     except Exception as ex:
         raise click.ClickException(ex)
 
 
 @app.command()
-@click.argument('package_strings', type=str, nargs=-1)
-def uninstall(package_strings: tuple[str]):
+@click.argument('package_specifiers', type=str, nargs=-1)
+def uninstall(package_specifiers: tuple[str]):
     """
-    Remove packages identified by package strings from site-packages.
+    Remove packages identified by package specifiers from site-packages.
     """
-    existing_package_strings = []
-    for package_string in package_strings:
-        if not packages.is_valid(package_string):
-            click.ClickException("Incorrect package string '%s'", package_string)
-        if not packages.is_installed(package_string):
-            click.echo(f"Package '{package_string}' is already removed, skipping")
+    if not config.exists():
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    existing_package_specifiers = []
+    for package_specifier in package_specifiers:
+        if not packages.is_valid(package_specifier):
+            raise click.ClickException(f"Incorrect package specifier {package_specifier}")
+        if not packages.is_installed(package_specifier):
+            click.echo(f"Package '{package_specifier}' is already removed, skipping")
         else:
-            existing_package_strings.append(package_string)
-    for package_string in existing_package_strings:
-        packages.uninstall(package_string)
+            existing_package_specifiers.append(package_specifier)
+    for package_specifier in existing_package_specifiers:
+        packages.uninstall(package_specifier)
 
 
 @app.command(name='list')
@@ -131,8 +137,8 @@ def list_(is_active_env: bool, environment_name_or_path: str | None = None):
     if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
     packages_info = {}
-    if environment_name_or_path is None and is_active_env == False:
-        site_packages_path = config.get_packages_dir()
+    if environment_name_or_path is None and not is_active_env:
+        site_packages_path = config.get_site_packages_dir()
         tree = rich.tree.Tree(site_packages_path)
         package_names = os.listdir(site_packages_path)
         for package_name in package_names:
@@ -192,45 +198,46 @@ def create(environment_name: str):
 
 @app.command()
 @click.option('--from_path', '-f', 'from_path', type=str, help="Environment to add all packages from")
-@click.argument('package_strings', type=str, nargs=-1)
+@click.argument('package_specifiers', type=str, nargs=-1)
 @click.option(
     '--environment_path', '-e', 'environment_path', type=str,
-    help="Path of the environment to add packages to"
+    help="Path of the environment to add packages to", required=False
 )
-def add(package_strings: tuple[str], environment_path: str, from_path: str):
+def add(package_specifiers: tuple[str], environment_path: str | None, from_path: str):
     """
     Add packages to the environment.
 
     If ENVIRONMENT_PATH is specified, then packages are added to it, otherwise activated environment is affected. If
     FROM_PATH is specified, then all its packages are also added to the target environment.
     """
+    if environment_path is None and not config.exists():
+        raise click.ClickException("No user configuration found, run `tip init` first")
     packages_to_add = []
     if from_path:
         env = environment.get_environment_by_path(from_path)
         for package_name, package_version in env.items():
             packages_to_add.append(f"{package_name}=={package_version}")
-    packages_to_add.extend(package_strings)
-    maybe_environment_path = environment_path if environment_path else None
-    for package_string in packages_to_add:
-        environment.add_to_environment(package_string, path=maybe_environment_path, replace=True)
+    packages_to_add.extend(package_specifiers)
+    maybe_environment_path = environment_path or None
+    for package_specifier in packages_to_add:
+        environment.add_to_environment(package_specifier, path=maybe_environment_path, replace=True)
 
 
 @app.command()
-@click.argument('package_strings', type=str, nargs=-1)
+@click.argument('package_specifiers', type=str, nargs=-1)
 @click.option('--environment_path', '-e', 'environment_path', type=str)
-def remove(package_strings: tuple[str], environment_path: str | None = None):
+def remove(package_specifiers: tuple[str], environment_path: str | None = None):
     """
     Remove packages from the environment.
 
     If ENVIRONMENT_PATH is specified, then packages are removed from it, otherwise activated environment is affected.
     """
-    for package_string in package_strings:
+    if environment_path is None and not config.exists():
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    for package_specifier in package_specifiers:
         try:
-            environment.remove_from_environment(package_string, path=environment_path)
+            environment.remove_from_environment(package_specifier, path=environment_path)
         except KeyError as ex:
-            click.echo("Package {ex} not in environment".format(ex=ex))
+            click.echo(f"Package {ex} not in environment")
         except ValueError as ex:
-            click.echo("Specified version {package_string} not found, current version: {ex}".format(
-                package_string=package_string,
-                ex=ex
-            ))
+            click.echo(f"Specified version {package_specifier} not found, current version: {ex}")

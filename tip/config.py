@@ -4,12 +4,12 @@ import json
 
 def get_package_dir(package_name: str, package_version: str) -> str:
     """Get path to the package by it's name and version."""
-    packages_dir = get_packages_dir()
+    packages_dir = get_site_packages_dir()
     package_dir = os.path.join(packages_dir, package_name, package_version)
     return package_dir
 
 
-def get_packages_dir() -> str:
+def get_site_packages_dir() -> str:
     """Get path to directory containg sources of all installed packages."""
     tip_home = get_tip_home()
     packages_dir = os.path.join(tip_home, "site-packages")
@@ -48,8 +48,7 @@ def get_active_environment_name() -> str | None:
 
 def get_user_config():
     """Get user config."""
-    with open(get_config_path(), mode='r') as user_config_file:
-        return json.load(user_config_file)
+    return _config
 
 
 def update(active_environment_name: str, tip_home: str):
@@ -58,7 +57,7 @@ def update(active_environment_name: str, tip_home: str):
         'active_environment_name': active_environment_name,
         'home_dir': tip_home,
     }
-    with open(get_config_path(), mode='w') as user_config_file:
+    with open(get_config_path(), mode='w', encoding='utf8') as user_config_file:
         json.dump(user_config, user_config_file)
 
 
@@ -71,3 +70,12 @@ def get_config_path():
     """Get path to the user config file."""
     home_dir = os.path.expanduser('~')
     return os.path.join(home_dir, '.tip')
+
+
+def load_config():
+    with open(get_config_path(), mode='r', encoding='utf8') as user_config_file:
+        global _config
+        _config = json.load(user_config_file)
+
+
+_config = {}
