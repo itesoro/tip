@@ -29,8 +29,8 @@ Show more info using `--help` with `tip` or concrete command.
 
 ## VSCode Integration
 
-In order to use tip with VSCode you must install `tip` and then provide path to `tipr` executable as current
-interpreter. It will use **all installed libraries** in current tip home. Read more in `tipr --help`.
+In order to use tip with VSCode you must install `tip` and then provide path to `tip_run` executable as current
+interpreter. It will use **all installed libraries** in current tip home. Read more in `tip_run --help`.
 
 ## Glossary
 

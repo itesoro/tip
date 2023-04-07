@@ -5,7 +5,7 @@ import click
 import rich
 import rich.tree
 
-from tip import config, environment, packages, tipr
+from tip import config, environment, packages, runner
 
 
 @click.group()
@@ -180,7 +180,7 @@ def run(module_name: str, command: str, environment_path: str, install_missing: 
     """
     if not config.exists():
         raise click.ClickException("No user configuration found, run `tip init` first")
-    return tipr.run(module_name, command, environment_path, install_missing, args)
+    return runner.run(module_name, command, environment_path, install_missing, args)
 
 
 @app.command()

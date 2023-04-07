@@ -17,7 +17,7 @@ from tip.tip_meta_finder import TipMetaFinder
 @click.option('-c', 'command')
 @click.option('--install-missing', 'install_missing', is_flag=True)
 @click.argument('args', nargs=-1, type=click.UNPROCESSED)
-def tipr(module_name: str, command: str, environment_path: str, install_missing: bool, args: tuple[str]):
+def tip_run(module_name: str, command: str, environment_path: str, install_missing: bool, args: tuple[str]):
     """
     Run a module, file, or command with access to all packages installed in the current TIP installation.
 
