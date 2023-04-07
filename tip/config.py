@@ -2,22 +2,6 @@ import os
 import json
 
 
-def get_package_dir(package_name: str, package_version: str) -> str:
-    """Get path to the package by it's name and version."""
-    packages_dir = get_site_packages_dir()
-    package_dir = os.path.join(packages_dir, package_name, package_version)
-    return package_dir
-
-
-def get_site_packages_dir() -> str:
-    """Get path to directory containg sources of all installed packages."""
-    tip_home = get_tip_home()
-    packages_dir = os.path.join(tip_home, "site-packages")
-    if not os.path.isdir(packages_dir):
-        os.makedirs(packages_dir)
-    return packages_dir
-
-
 def get_links_dir() -> str:
     """Get path to directory containing links to all installed packages."""
     tip_home = get_tip_home()
@@ -38,7 +22,7 @@ def get_environments_dir() -> str:
 
 def get_tip_home() -> str:
     """Get path to tip home directory."""
-    return get_user_config()['home_dir']
+    return get_user_config()['tip_home']
 
 
 def get_active_environment_name() -> str | None:
@@ -48,6 +32,8 @@ def get_active_environment_name() -> str | None:
 
 def get_user_config():
     """Get user config."""
+    if _config is None:
+        raise RuntimeError("Config wasn't loaded")
     return _config
 
 
@@ -55,7 +41,7 @@ def update(active_environment_name: str, tip_home: str):
     """Create (or overwrite if exists) user config file."""
     user_config = {
         'active_environment_name': active_environment_name,
-        'home_dir': tip_home,
+        'tip_home': tip_home,
     }
     with open(get_config_path(), mode='w', encoding='utf8') as user_config_file:
         json.dump(user_config, user_config_file)
@@ -68,8 +54,8 @@ def exists() -> bool:
 
 def get_config_path():
     """Get path to the user config file."""
-    home_dir = os.path.expanduser('~')
-    return os.path.join(home_dir, '.tip')
+    tip_home = os.path.expanduser('~')
+    return os.path.join(tip_home, '.tip')
 
 
 def load_config():
@@ -78,4 +64,4 @@ def load_config():
         _config = json.load(user_config_file)
 
 
-_config = {}
+_config = None

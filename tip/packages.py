@@ -44,7 +44,7 @@ def is_installed(package_specifier: str) -> bool:
 def locate(package: str) -> str:
     """Find package directory path."""
     package_name, package_version = parse(package)
-    packages_dir = config.get_site_packages_dir()
+    packages_dir = get_site_packages_dir()
     os.makedirs(packages_dir, exist_ok=True)
     package_dir = os.path.join(packages_dir, package_name, package_version)
     return package_dir
@@ -76,6 +76,22 @@ def is_valid(package_specifier: str) -> bool:
     except ValueError:
         return False
     return True
+
+
+def get_package_dir(package_name: str, package_version: str) -> str:
+    """Get path to the package by it's name and version."""
+    packages_dir = get_site_packages_dir()
+    package_dir = os.path.join(packages_dir, package_name, package_version)
+    return package_dir
+
+
+def get_site_packages_dir() -> str:
+    """Get path to directory containg sources of all installed packages."""
+    tip_home = config.get_tip_home()
+    packages_dir = os.path.join(tip_home, "site-packages")
+    if not os.path.isdir(packages_dir):
+        os.makedirs(packages_dir)
+    return packages_dir
 
 
 def _install(package_specifier: str):

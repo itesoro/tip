@@ -18,28 +18,28 @@ def app():
 
 
 @app.command()
-@click.argument('home_dir', type=str)
-def init(home_dir):
+@click.argument('tip_home_dir', type=str)
+def init(tip_home_dir):
     """
-    Initialize user configuration file and tip home folder at HOME.
+    Initialize user configuration file and tip home folder at TIP_HOME_DIR.
     """
-    if os.path.isfile(home_dir):
-        raise click.ClickException(f"{home_dir} is a file")
-    if not os.path.exists(home_dir):
-        os.makedirs(home_dir)
+    if os.path.isfile(tip_home_dir):
+        raise click.ClickException(f"{tip_home_dir} is a file")
+    if not os.path.exists(tip_home_dir):
+        os.makedirs(tip_home_dir)
     else:
         click.echo('Home directory already exists')
     user_config_path = config.get_config_path()
     if os.path.isdir(user_config_path):
         raise click.ClickException(f"{user_config_path} must be a file, found directory")
     if not config.exists():
-        base_environment_path = os.path.join(home_dir, "environments", "base.json")
+        base_environment_path = os.path.join(tip_home_dir, "environments", "base.json")
         os.makedirs(os.path.dirname(base_environment_path), exist_ok=True)
         if not os.path.exists(base_environment_path):
             environment.create_environment_file({}, base_environment_path)
         config.update(
             active_environment_name='base',
-            tip_home=home_dir
+            tip_home=tip_home_dir
         )
     else:
         with open(user_config_path, mode='r', encoding='utf8') as user_config_file:
@@ -47,7 +47,7 @@ def init(home_dir):
                 user_config = json.load(user_config_file)
             except Exception as ex:
                 raise click.ClickException(f"Invalid user configuration file: {ex}")
-        user_config['home_dir'] = home_dir
+        user_config['tip_home'] = tip_home_dir
         with open(user_config_path, mode='w', encoding='utf8') as user_config_file:
             json.dump(user_config, user_config_file)
 
@@ -66,7 +66,7 @@ def activate(environment_name: str):
         raise click.ClickException(f"Environment {environment_name} not found, create with `tip create`")
     config.update(
         active_environment_name=environment_name,
-        tip_home=user_config['home_dir']
+        tip_home=user_config['tip_home']
     )
 
 
@@ -138,11 +138,11 @@ def list_(is_active_env: bool, environment_name_or_path: str | None = None):
         raise click.ClickException("No user configuration found, run `tip init` first")
     packages_info = {}
     if environment_name_or_path is None and not is_active_env:
-        site_packages_path = config.get_site_packages_dir()
-        tree = rich.tree.Tree(site_packages_path)
-        package_names = os.listdir(site_packages_path)
+        site_packages_dir = packages.get_site_packages_dir()
+        tree = rich.tree.Tree(site_packages_dir)
+        package_names = os.listdir(site_packages_dir)
         for package_name in package_names:
-            package_versions = sorted(os.listdir(os.path.join(site_packages_path, package_name)))
+            package_versions = sorted(os.listdir(os.path.join(site_packages_dir, package_name)))
             packages_info[package_name] = package_versions
     else:
         if is_active_env:
