@@ -26,7 +26,7 @@ def get_tip_home() -> str:
 
 
 def get_active_environment_name() -> str | None:
-    """Get active environment name if it's set."""
+    """Get active environment name."""
     return get_user_config()['active_environment_name']
 
 
