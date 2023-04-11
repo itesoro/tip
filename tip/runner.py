@@ -27,7 +27,7 @@ def tipython(module_name: str, command: str, install_missing: bool, args: tuple[
     """
     if (tip_home := config.get('tip_home')) is None:
         raise click.ClickException("No user configuration found, run `tip init` first")
-    sys.path.append(packages.get_links_dir(tip_home))
+    sys.path.insert(0, packages.get_links_dir(tip_home))
     return run(tip_home, module_name, command, None, install_missing, args)
 
 
