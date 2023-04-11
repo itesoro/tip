@@ -1,35 +1,20 @@
 import os
 import json
-from functools import cache
 
-from . import config, packages
-
-
-@cache
-def get_active_environment() -> dict | None:
-    """Get active environment if it's set or return `None`."""
-    environments_dir = config.get_environments_dir()
-    if (active_environment := config.get_active_environment_name()) is None:
-        return None
-    environment_path = os.path.join(environments_dir, active_environment + '.json')
-    return get_environment_by_path(environment_path)
+from . import packages
 
 
-def exists(name: str) -> bool:
-    """Check if file of the environment called `name` exists."""
-    path = get_environment_path(name)
-    return os.path.isfile(path)
+def _get_environments_dir(tip_home: str) -> str:
+    """Get path to the directory containing environment files."""
+    environments_dir = os.path.join(tip_home, "environments")
+    if not os.path.isdir(environments_dir):
+        os.makedirs(environments_dir)
+    return environments_dir
 
 
-def get_environment_by_name(name: str) -> dict:
-    """Get package list of the environment called `name`"""
-    path = get_environment_path(name)
-    return get_environment_by_path(path)
-
-
-def get_environment_path(name: str) -> str:
+def get_environment_path(tip_home: str, name: str) -> str:
     """Find file of the environment called `name`."""
-    return os.path.join(config.get_environments_dir(), f"{name}.json")
+    return os.path.join(_get_environments_dir(tip_home), f"{name}.json")
 
 
 def get_environment_by_path(path: str) -> dict:
@@ -40,50 +25,59 @@ def get_environment_by_path(path: str) -> dict:
         return json.load(environment_file)
 
 
-def add_to_environment(package: str, path: str | None, replace: bool = False):
-    """Add package to the environment file at `path` or into active environment."""
-    if path is None:
-        path = os.path.join(config.get_environments_dir(), config.get_active_environment_name() + '.json')
+def get_environment_by_name(tip_home: str, name: str) -> dict:
+    """Get package list of the environment called `name`"""
+    path = get_environment_path(tip_home, name)
+    return get_environment_by_path(path)
+
+
+def save_environment(environment: dict | None, path: str, /, *, rewrite: bool = False):
+    """Save environment to path, rewriting the file if `rewrite` is True."""
+    if os.path.isfile(path) and not rewrite:
+        raise RuntimeError("Environment file exists and asked not to rewrite")
+    with open(path, mode='w+', encoding='utf8') as environment_file:
+        json.dump({} if environment is None else environment, environment_file)
+
+
+def exists(tip_home: str, name: str) -> bool:
+    """Check if file of the environment called `name` exists."""
+    path = get_environment_path(tip_home, name)
+    return os.path.isfile(path)
+
+
+def add_to_environment_at_path(package: str, path: str, replace: bool = False):
+    """Add package to the environment file at `path`."""
     environment = get_environment_by_path(path)
     package_name, package_version = packages.parse(package)
-    if (curr_version := environment.get(package_name)) is not None and not replace:
+    if (curr_version := environment.get(package_name)) is not None:
         if curr_version == package_version:
             return
-        raise RuntimeError(f"Package {package_name} is already in environment and has version {curr_version}")
+        if not replace:
+            raise RuntimeError(f"Package {package_name} is already in environment and has version {curr_version}")
     environment[package_name] = package_version
-    create_environment_file(environment, path, replace=True)
+    save_environment(environment, path, rewrite=True)
 
 
-def remove_from_environment(package: str, path: str | None):
-    """Remove package from the environment file at `path` or from active environment."""
-    if path is None:
-        path = os.path.join(config.get_environments_dir(), config.get_active_environment_name() + '.json')
+def add_to_environment_with_name(tip_home, package: str, environment_name: str, replace: bool = False):
+    """Add package to the environment `environment_name`."""
+    environment_path = get_environment_by_name(tip_home, environment_name)
+    add_to_environment_at_path(package, environment_path, replace)
+
+
+def remove_from_environment_at_path(package_specifier: str, path: str):
+    """Remove package from the environment file at `path`."""
     environment = get_environment_by_path(path)
-    package_name, package_version = packages.parse(package)
-    if package_name not in environment:
-        raise KeyError(package_name)
+    package_name, package_version = packages.parse(package_specifier)
     if environment[package_name] != package_version:
         raise ValueError(package_version)
     del environment[package_name]
-    create_environment_file(environment, path, replace=True)
+    save_environment(environment, path, rewrite=True)
 
 
-def missing_packages(environment: dict) -> list[str]:
-    """Get list of not yet installed packages for environment."""
-    missing_packages = []
-    for package_name, package_version in environment.items():
-        package_specifier = packages.make_package_specifier(package_name, package_version)
-        if not packages.is_installed(package_specifier):
-            missing_packages.append(package_specifier)
-    return missing_packages
-
-
-def create_environment_file(environment: dict | None, path: str, /, *, replace: bool = False):
-    """Create new environment files at `path` or `$TIP_HOME/environments`, add `packages` to it if they are given."""
-    if os.path.isfile(path) and not replace:
-        raise RuntimeError("Environment file exists and asked not to replace")
-    with open(path, mode='w+', encoding='utf8') as environment_file:
-        json.dump({} if environment is None else environment, environment_file)
+def remove_from_environment_with_name(tip_home, package_specifier: str, name: str):
+    """Remove package from the environment file at `path`."""
+    environment_path = get_environment_path(tip_home, name)
+    remove_from_environment_at_path(package_specifier, environment_path)
 
 
 def remove_environment_file(path: str):
