@@ -6,7 +6,7 @@ package and to use it in different environments.
 ## Installation
 
 Install this package using `pip install`. It will create [TIP Directory](#glossary) `~/tip`, but if you want to override
-its path set your path in `TIP_DIR` environment variable.
+its path set it in `TIP_DIR` environment variable.
 
 ## Usage
 
@@ -51,7 +51,7 @@ environment.
 - Install our libraries:
     - Like `pip install`
     - Like `pip install -e`
-- Dependencies of the installed packages may be already installed, avoid their duplication
+- Dependencies of the installed packages may already be installed, avoid their duplication
 
 ## Known Issues
 
