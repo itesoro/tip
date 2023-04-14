@@ -19,8 +19,7 @@ def app():
 @pass_config
 def activate(environment_name: str, config):
     """Make environment ENVIRONMENT_NAME active."""
-    if (tip_dir := config.get('tip_dir')) is None:
-        raise click.ClickException("No user configuration found, run `tip init` first")
+    tip_dir = _get_tip_home_or_raise(config)
     environment_path = environment.get_environment_path(tip_dir, environment_name)
     if not os.path.isfile(environment_path):
         raise click.ClickException(f"Environment {environment_name} doesn't exist")
@@ -31,8 +30,7 @@ def activate(environment_name: str, config):
 @pass_config
 def info(config):
     """Display information about current tip environment."""
-    if (tip_dir := config.get('tip_dir')) is None:
-        raise click.ClickException("No user configuration found, run `tip init` first")
+    tip_dir = _get_tip_home_or_raise(config)
     active_env_name = config.get('active_environment_name')
     active_env_path = environment.get_environment_path(tip_dir, active_env_name)
     click.echo(f"active env: {active_env_name}")
@@ -46,8 +44,7 @@ def info(config):
 @pass_config
 def install(package_specifiers: tuple[str], environment_path: str | None, config):
     """Download and install packages by PACKAGE_SPECIFIERS to make them runnable with `tip run`."""
-    if (tip_dir := config.get('tip_dir')) is None:
-        raise click.ClickException("No user configuration found, run `tip init` first")
+    tip_dir = _get_tip_home_or_raise(config)
     active_environment_name = config.get('active_environment_name')
     if environment_path is None:
         environment_path = environment.get_environment_path(tip_dir, active_environment_name)
@@ -64,8 +61,7 @@ def install(package_specifiers: tuple[str], environment_path: str | None, config
 @pass_config
 def uninstall(package_specifiers: tuple[str], config):
     """Uninstall packages identified by package specifiers from site-packages."""
-    if (tip_dir := config.get('tip_dir')) is None:
-        raise click.ClickException("No user configuration found, run `tip init` first")
+    tip_dir = _get_tip_home_or_raise(config)
     existing_package_specifiers = []
     for package_specifier in package_specifiers:
         if not packages.is_valid(package_specifier):
@@ -91,8 +87,7 @@ def list_(is_active_env: bool, environment_name_or_path: str | None, config):
     """
     if is_active_env and environment_name_or_path is not None:
         raise click.ClickException("Only one of ACTIVE_ENV or ENVIRONMENT_PATH should be specified")
-    if (tip_dir := config.get('tip_dir')) is None:
-        raise click.ClickException("No user configuration found, run `tip init` first")
+    tip_dir = _get_tip_home_or_raise(config)
     packages_info = {}
     if environment_name_or_path is None and not is_active_env:
         site_packages_dir = packages.get_site_packages_dir(tip_dir)
@@ -140,8 +135,7 @@ def run(module_name: str, command: str, environment_path: str, install_missing: 
 
     In order to use environment all packages must be installed or run with '--install-missing'.
     """
-    if (tip_dir := config.get('tip_dir')) is None:
-        raise click.ClickException("No user configuration found, run `tip init` first")
+    tip_dir = _get_tip_home_or_raise(config)
     if environment_path is None:
         active_environment_name = config.get('active_environment_name')
         environment_path = environment.get_environment_path(tip_dir, active_environment_name)
@@ -153,8 +147,7 @@ def run(module_name: str, command: str, environment_path: str, install_missing: 
 @pass_config
 def create(environment_name: str, config):
     """Create new environment."""
-    if (tip_dir := config.get('tip_dir')) is None:
-        raise click.ClickException("No user configuration found, run `tip init` first")
+    tip_dir = _get_tip_home_or_raise(config)
     path = environment.get_environment_path(tip_dir, environment_name)
     try:
         environment.save_environment(None, path)
@@ -177,8 +170,7 @@ def add(package_specifiers: tuple[str], environment_path: str | None, from_path:
     If ENVIRONMENT_PATH is specified, then packages are added to it, otherwise activated environment is affected. If
     FROM_PATH is specified, then all its packages are also added to the target environment.
     """
-    if (tip_dir := config.get('tip_dir')) is None:
-        raise click.ClickException("No user configuration found, run `tip init` first")
+    tip_dir = _get_tip_home_or_raise(config)
     packages_to_add = []
     if from_path:
         env = environment.get_environment_by_path(from_path)
@@ -201,8 +193,7 @@ def remove(package_specifiers: tuple[str], environment_path: str | None, config)
 
     If ENVIRONMENT_PATH is specified, then packages are removed from it, otherwise activated environment is affected.
     """
-    if (tip_dir := config.get('tip_dir')) is None:
-        raise click.ClickException("No user configuration found, run `tip init` first")
+    tip_dir = _get_tip_home_or_raise(config)
     active_environment_name = config.get('active_environment_name')
     environment_path = environment_path or environment.get_environment_path(tip_dir, active_environment_name)
     for package_specifier in package_specifiers:
@@ -212,3 +203,9 @@ def remove(package_specifiers: tuple[str], environment_path: str | None, config)
             click.echo(f"Package {ex} not in environment")
         except ValueError as ex:
             click.echo(f"Specified version {package_specifier} not found, current version: {ex}")
+
+
+def _get_tip_home_or_raise(config):
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("The configuration is corrupted; consider reinstalling tip")
+    return tip_dir

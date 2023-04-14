@@ -25,27 +25,27 @@ def tipython(module_name: str, command: str, install_missing: bool, args: tuple[
     The common use case for this utility is as a VSCode interpreter. Instead of creating multiple executables for each
     environment, this single utility can access all the packages.
     """
-    if (tip_home := config.get('tip_home')) is None:
-        raise click.ClickException("No user configuration found, run `tip init` first")
-    sys.path.insert(0, packages.get_links_dir(tip_home))
-    return run(tip_home, module_name, command, None, install_missing, args)
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("The configuration is corrupted; consider reinstalling tip")
+    sys.path.insert(0, packages.get_links_dir(tip_dir))
+    return run(tip_dir, module_name, command, None, install_missing, args)
 
 
 def run_in_env(
         module_name: str,
         command: str,
-        tip_home: str,
+        tip_dir: str,
         environment_name: str,
         install_missing: bool,
         args: tuple[str]
     ):
     """Run given module, command or file using environment `environment_name`."""
-    environment_path = environment.get_environment_by_name(tip_home, environment_name)
-    run(tip_home, module_name, command, environment_path, install_missing, args)
+    environment_path = environment.get_environment_by_name(tip_dir, environment_name)
+    run(tip_dir, module_name, command, environment_path, install_missing, args)
 
 
 def run(
-        tip_home: str,
+        tip_dir: str,
         module_name: str,
         command: str,
         environment_path: str | None,
@@ -61,8 +61,8 @@ def run(
     env = environment.get_environment_by_path(environment_path) if environment_path is not None else {}
     if install_missing:
         package_specifiers = [packages.make_package_specifier(name, version) for name, version in env.items()]
-        packages.install(tip_home, package_specifiers)
-    packages_to_folders = _map_packages_to_folders(tip_home, env)
+        packages.install(tip_dir, package_specifiers)
+    packages_to_folders = _map_packages_to_folders(tip_dir, env)
     finder = TipMetaFinder(packages_to_folders)
     sys.meta_path.insert(0, finder)
     _remove_external_imports()
@@ -119,10 +119,10 @@ def _disable_pycache():
         sys.dont_write_bytecode = old_dont_write_bytecode
 
 
-def _map_packages_to_folders(tip_home: str, env: dict) -> dict:
+def _map_packages_to_folders(tip_dir: str, env: dict) -> dict:
     packages_to_folders = {}
     for package_name, package_version in env.items():
-        package_dir = packages.locate(tip_home, f"{package_name}=={package_version}")
+        package_dir = packages.locate(tip_dir, f"{package_name}=={package_version}")
         if not os.path.isdir(package_dir):
             raise click.ClickException(f"Package '{package_name}=={package_version}' is not installed")
         package_files = os.listdir(package_dir)
