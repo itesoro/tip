@@ -1,78 +1,66 @@
 # Tesoro Installer of Packages
 
-TIP is a package manager that allows user to use the same package file across multiple environments.
+**TIP** (Tesoro Installer of Packages) is a package manager built around PIP. It allows to keep only one copy of a
+package and to use it in different environments.
 
-## Quick Start
+## Installation
 
-Create and set a path where packages will be downloaded:
-
-```bash
-mkdir -p /usr/local/tip/site-packages
-export TIP_SITE_PACKAGES=/usr/local/tip/site-packages
-```
-
-Create environment file `environment.json` with following content:
-
-```json
-{
-    "numpy": "1.22.0",
-    "pymongo": "4.1.1"
-}
-```
-
-Install packages from that environment:
+Install this package using `pip install`. After that run:
 
 ```bash
-tip install -e environment.json
+tip init <path-to-tip-home>
 ```
 
-Or simply by providing package names and versions:
+Value of `path-to-tip-home` must be a path to TIP home (see Glossary).
 
-```bash
-tip install numpy==1.22.0 pymongo==4.1.1
-```
+## Usage
 
-And run your script:
+TIP has several commands:
 
-```bash
-tip run path/to/script.py
-```
+- `add` new package by it's package specifier to the current environment (or specify environment using `-e`)
+- `create` create new environment
+- `init` create tip home and user configuration file at `~/.tip`
+- `install` download and install package(-s) so it's can be used within environment
+- `list` print installed packages and their versions
+- `run` is used as `python` command except it uses active environment to import hook packages added into it
+- `uninstall` removes previously installed package(-s)
 
-Or module:
+Show more info using `--help` with `tip` or concrete command.
 
-```bash
-tip run -m pytest .
-```
+## VSCode Integration
 
-## Commands Overview
+In order to use tip with VSCode you must install `tip` and then provide path to `tip_run` executable as current
+interpreter. It will use **all installed libraries** in current tip home. Read more in `tip_run --help`.
 
-TIP has following commands:
+## Glossary
 
-- install
-- remove
-- list
-- run
+**Package Specifier** - package name and version in format of `<package_name>==<package_version>`.
 
-### Install
+**Environment** - a set of packages with their versions used when running python modules to import hook them. Packages
+are determined by environment file.
 
-`tip install <package>==<version>` downloads and prepares packages to be imported into your script. It uses pip, so
-you can expect the same behaviour as `pip install`. Packages are saved into directory you set in
-`TIP_SITE_PACKAGES` environment variable. This folder should not be modified in order for TIP to work properly.
+**TIP Home** - a directory which contains all installed packages, environment definitions and other system files.
 
-`tip install` also takes an option `-e/--env` which is a path to an environment file. When provided, the packages
-from that environment will be installed if possible.
+**Add Package** - append new package to the environment or update it's version.
 
-### Remove
+**Install Package** - download and make importable a `pip` package.
 
-`tip remove <package>==<version>` removes previously installed package.
+**Active Environment** - environment which will be used when running `tip run` on a module without specifying concrete
+environment.
 
-### List
+## TODO
 
-`tip list` shows a tree of all installed packages and all versions of that packages.
+- When adding packages make sure they are not duplicated
+- `tip install package` without package_version (use latest)
+- `tip add package` without package_version (use latest)
+- Install our libraries:
+    - Like `pip install`
+    - Like `pip install -e`
+- Dependencies of the installed packages may be already installed, avoid their duplication
 
-### Run
+## Known Issues
 
-`tip run path/to/script.py` or `tip run -m module` executes a python script or module using packages taken from
-`environment.json`. If you want to provide another environment file, use `-e` option.
-
-You can also use option `--install-missing` to ensure all environment packages are installed.
+- Because of packages links we may reach packages that are not part of current environemnt but are part of other env
+- `tip run -m module` error message when there is no `__main__.py` file may have better formatting
+- Uninstalling a package doesn't remove link: we must not just delete it but add link to other package version if it
+exists

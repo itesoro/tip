@@ -1,73 +1,125 @@
 import os
-import sys
-import json
-import shutil
-import importlib
-import contextlib
-import subprocess
-from importlib.util import module_from_spec, spec_from_file_location\
 
+import click
 import rich
 import rich.tree
-import click
 
-from tip.tip_meta_finder import TipMetaFinder
+from tip.config import pass_config
+from tip import environment, packages, runner
+
 
 
 @click.group()
 def app():
     """TIP package manager."""
-    pass
 
 
 @app.command()
-@click.option('--env', '-e', 'environment_path')
-@click.argument('packages', type=str, nargs=-1)
-def install(packages: tuple[str], environment_path: str):
-    """
-    Download and install PACKAGES to make them runnable with `tip run`.
-
-    In order to run this command make sure you have set the TIP_SITE_PACKAGES environment variable. It must contain
-    an absolute path to a folder where the packages will be downloaded.
-    """
-    packages = list(packages)
-    if environment_path is not None:
-        environment = _read_environment(environment_path)
-        packages.extend([f"{package_name}=={package_version}" for package_name, package_version in environment.items()])
-    _validate_package_names(packages)
-    for package in packages:
-        _install_package(package)
+@click.argument('environment_name', type=str)
+@pass_config
+def activate(environment_name: str, config):
+    """Make environment ENVIRONMENT_NAME active."""
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    environment_path = environment.get_environment_path(tip_dir, environment_name)
+    if not os.path.isfile(environment_path):
+        raise click.ClickException(f"Environment {environment_name} doesn't exist")
+    config['active_environment_name'] = environment_name
 
 
 @app.command()
-@click.option('--env', '-e', 'environment_path')
-@click.argument('packages', type=str, nargs=-1)
-def remove(packages: tuple[str], environment_path: str):
-    """
-    Remove PACKAGES from the environment.
-    """
-    packages = list(packages)
-    if environment_path is not None:
-        environment = _read_environment(environment_path)
-        packages.extend([f"{package_name}=={package_version}" for package_name, package_version in environment.items()])
-    if len(packages) == 0:
-        click.echo("No packages to remove")
-        return
-    _validate_package_names(packages)
-    for package in packages:
-        _remove_package(package)
+@pass_config
+def info(config):
+    """Display information about current tip environment."""
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    active_env_name = config.get('active_environment_name')
+    active_env_path = environment.get_environment_path(tip_dir, active_env_name)
+    click.echo(f"active env: {active_env_name}")
+    click.echo(f"active env location: {active_env_path}")
+    click.echo(f"TIP directory: {tip_dir}")
+
+
+@app.command()
+@click.option('--env', '-e', 'environment_path', type=str, default=None)
+@click.argument('package_specifiers', type=str, nargs=-1)
+@pass_config
+def install(package_specifiers: tuple[str], environment_path: str | None, config):
+    """Download and install packages by PACKAGE_SPECIFIERS to make them runnable with `tip run`."""
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    active_environment_name = config.get('active_environment_name')
+    if environment_path is None:
+        environment_path = environment.get_environment_path(tip_dir, active_environment_name)
+    try:
+        packages.install(tip_dir, package_specifiers, environment_path)
+        for package_specifier in package_specifiers:
+            environment.add_to_environment_with_name(tip_dir, package_specifier, active_environment_name, replace=True)
+    except Exception as ex:
+        raise click.ClickException(ex)
+
+
+@app.command()
+@click.argument('package_specifiers', type=str, nargs=-1)
+@pass_config
+def uninstall(package_specifiers: tuple[str], config):
+    """Uninstall packages identified by package specifiers from site-packages."""
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    existing_package_specifiers = []
+    for package_specifier in package_specifiers:
+        if not packages.is_valid(package_specifier):
+            raise click.ClickException(f"Incorrect package specifier {package_specifier}")
+        if not packages.is_installed(tip_dir, package_specifier):
+            click.echo(f"Package '{package_specifier}' is not installed, skipping")
+        else:
+            existing_package_specifiers.append(package_specifier)
+    for package_specifier in existing_package_specifiers:
+        packages.uninstall(tip_dir, package_specifier)
 
 
 @app.command(name='list')
-def list_():
+@click.option('--active-env', '-a', 'is_active_env', is_flag=True)
+@click.argument("environment_name_or_path", type=str, required=False, default=None)
+@pass_config
+def list_(is_active_env: bool, environment_name_or_path: str | None, config):
     """
-    Show installed packages.
+    Show added or installed packages.
+
+    If IS_ACTIVE_ENV is set, display packages from the active environment. If the ENVIRONMENT option is specified,
+    display packages from the chosen environment. Otherwise, display all packages for the current TIP installation.
     """
-    site_packages_path = os.environ['TIP_SITE_PACKAGES']
-    tree = rich.tree.Tree(site_packages_path)
-    package_names = os.listdir(site_packages_path)
-    for package_name in package_names:
-        package_versions = sorted(os.listdir(os.path.join(site_packages_path, package_name)))
+    if is_active_env and environment_name_or_path is not None:
+        raise click.ClickException("Only one of ACTIVE_ENV or ENVIRONMENT_PATH should be specified")
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    packages_info = {}
+    if environment_name_or_path is None and not is_active_env:
+        site_packages_dir = packages.get_site_packages_dir(tip_dir)
+        tree = rich.tree.Tree(site_packages_dir)
+        package_names = os.listdir(site_packages_dir)
+        for package_name in package_names:
+            package_versions = sorted(os.listdir(os.path.join(site_packages_dir, package_name)))
+            packages_info[package_name] = package_versions
+    else:
+        if is_active_env:
+            active_environment_name = config.get('active_environment_name')
+            tree = rich.tree.Tree(active_environment_name)
+            packages_info = environment.get_environment_by_name(tip_dir, active_environment_name)
+        else:
+            tree = rich.tree.Tree(environment_name_or_path)
+            try:
+                packages_info = environment.get_environment_by_name(tip_dir, environment_name_or_path)
+            except FileNotFoundError:
+                if os.path.isfile(environment_name_or_path):
+                    packages_info = environment.get_environment_by_path(environment_name_or_path)
+                else:
+                    raise click.ClickException("Environment not found")
+        packages_info = {k: [v] for k, v in packages_info.items()}
+    if len(packages_info) == 0:
+        click.echo("No packages found!")
+        return
+    for package_name, package_versions in packages_info.items():
         if len(package_versions) > 0:
             package_tree = tree.add(f"📦 {package_name}")
         for package_version in package_versions:
@@ -77,136 +129,86 @@ def list_():
 
 @app.command(context_settings={'ignore_unknown_options': True})
 @click.option('-m', '--module', 'module_name', type=str)
-@click.option('--env', '-e', 'environment_path')
+@click.option('--env', '-e', 'environment_path', type=str)
+@click.option('-c', 'command')
 @click.option('--install-missing', 'install_missing', is_flag=True)
 @click.argument('args', nargs=-1, type=click.UNPROCESSED)
-def run(module_name: str, environment_path: str, install_missing: bool, args: tuple[str]):
+@pass_config
+def run(module_name: str, command: str, environment_path: str, install_missing: bool, args: tuple[str], config):
     """
     Run a module or a script using given environment at ENVIRONMENT_PATH.
 
-    In order to use environment all packages must be installed.
+    In order to use environment all packages must be installed or run with '--install-missing'.
     """
-    is_module_name_given = isinstance(module_name, str) and len(module_name) > 0
-    is_python_file_path_given = not is_module_name_given and len(args) > 0
-    if not (is_module_name_given or is_python_file_path_given):
-        raise click.ClickException("Provide one of --module or python_file_path must be given")
-    if is_python_file_path_given:
-        python_file_path = args[0]
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("No user configuration found, run `tip init` first")
     if environment_path is None:
-        environment_path = 'environment.json'
-    environment = _read_environment(environment_path)
-    if install_missing:
-        _install_missing(environment)
-    packages_to_folders = _map_packages_to_folders(environment)
-    finder = TipMetaFinder(packages_to_folders)
-    sys.meta_path.insert(0, finder)
-    if is_python_file_path_given:
-        _run_file(python_file_path, args)
-    else:
-        _run_module(module_name, args)
+        active_environment_name = config.get('active_environment_name')
+        environment_path = environment.get_environment_path(tip_dir, active_environment_name)
+    return runner.run(tip_dir, module_name, command, environment_path, install_missing, args)
 
 
-def _run_module(name: str, args):
-    module_name = "__main__"
-    with _disable_pycache():
-        module = importlib.import_module(name)
-        main_path = os.path.join(module.__path__[0], "__main__.py")
-        sys.argv = [main_path] + list(args)
-        main_spec = spec_from_file_location(module_name, main_path)
-        main_module = module_from_spec(main_spec)
-        sys.modules[module_name] = main_module
-        main_spec.loader.exec_module(main_module)
-
-
-def _run_file(filename: str, args):
-    module_name = "__main__"
-    sys.argv = [filename] + list(args)
-    spec = spec_from_file_location(module_name, filename)
-    with _disable_pycache():
-        module_to_run = module_from_spec(spec)
-        sys.modules[module_name] = module_to_run
-        spec.loader.exec_module(module_to_run)
-
-
-def _remove_package(package: str):
-    package_name, package_version = package.split('==')
-    package_dir = os.path.join(os.environ['TIP_SITE_PACKAGES'], package_name, package_version)
-    if os.path.exists(package_dir):
-        shutil.rmtree(package_dir)
-        click.echo(f'Removed {package_name}=={package_version}')
-    else:
-        click.echo(f'Package {package_name} not found, skipping')
-
-
-@contextlib.contextmanager
-def _disable_pycache():
-    old_dont_write_bytecode = sys.dont_write_bytecode
-    sys.dont_write_bytecode = True
+@app.command()
+@click.argument('environment_name', type=str)
+@pass_config
+def create(environment_name: str, config):
+    """Create new environment."""
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    path = environment.get_environment_path(tip_dir, environment_name)
     try:
-        yield
-    finally:
-        sys.dont_write_bytecode = old_dont_write_bytecode
+        environment.save_environment(None, path)
+    except RuntimeError as ex:
+        raise click.ClickException(ex)
 
 
-def _install_missing(environment: dict):
-    for package_name, package_version in environment.items():
-        _install_package(f"{package_name}=={package_version}")
+@app.command()
+@click.option('--from_path', '-f', 'from_path', type=str, help="Environment to add all packages from")
+@click.argument('package_specifiers', type=str, nargs=-1)
+@click.option(
+    '--environment_path', '-e', 'environment_path', type=str,
+    help="Path of the environment to add packages to", required=False, default=None
+)
+@pass_config
+def add(package_specifiers: tuple[str], environment_path: str | None, from_path: str, config):
+    """
+    Add packages to the environment.
+
+    If ENVIRONMENT_PATH is specified, then packages are added to it, otherwise activated environment is affected. If
+    FROM_PATH is specified, then all its packages are also added to the target environment.
+    """
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    packages_to_add = []
+    if from_path:
+        env = environment.get_environment_by_path(from_path)
+        for package_name, package_version in env.items():
+            packages_to_add.append(f"{package_name}=={package_version}")
+    packages_to_add.extend(package_specifiers)
+    active_environment_name = config.get('active_environment_name')
+    environment_path = environment_path or environment.get_environment_path(tip_dir, active_environment_name)
+    for package_specifier in packages_to_add:
+        environment.add_to_environment_at_path(package_specifier, environment_path, replace=True)
 
 
-def _read_environment(environment_path: str) -> dict:
-    try:
-        with open(environment_path, mode='r') as environment_file:
-            return json.load(environment_file)
-    except Exception as ex:
-        raise click.ClickException(f'Couldn\'t read environment file "{environment_path}": {ex}')
+@app.command()
+@click.argument('package_specifiers', type=str, nargs=-1)
+@click.option('--environment_path', '-e', 'environment_path', type=str, default=None)
+@pass_config
+def remove(package_specifiers: tuple[str], environment_path: str | None, config):
+    """
+    Remove packages from the environment.
 
-
-def _install_package(package: str):
-    package_name, package_version = package.split('==')
-    package_dir = _get_package_dir(package_name, package_version)
-    if os.path.exists(package_dir):
-        click.echo(f"Package '{package}' is already installed")
-        return
-    os.makedirs(package_dir, exist_ok=True)
-    command = f"pip install --target={package_dir} {package}"
-    try:
-        subprocess.check_output(command, shell=True)
-    except Exception as ex:
-        shutil.rmtree(package_dir)
-        raise click.ClickException(f'Error while installing package "{package}: {ex}"')
-
-
-def _map_packages_to_folders(environment: dict) -> dict:
-    packages_to_folders = {}
-    for package_name, package_version in environment.items():
-        package_dir = _get_package_dir(package_name, package_version)
-        if not os.path.isdir(package_dir):
-            raise click.ClickException(f"Package '{package_name}=={package_version}' is not installed")
-        package_files = os.listdir(package_dir)
-        package_subpackages = [entry.removesuffix('.py') for entry in package_files
-                               if _is_package_or_module(os.path.join(package_dir, entry))]
-        for subpackage in package_subpackages:
-            packages_to_folders[subpackage] = package_dir
-    return packages_to_folders
-
-
-def _is_package_or_module(name: str) -> bool:
-    is_package = os.path.exists(os.path.join(name, '__init__.py'))
-    is_module = name.endswith('.py')
-    return is_package or is_module
-
-
-def _validate_package_names(packages: tuple[str]):
-    for package_name in packages:
-        if '==' not in package_name:
-            raise click.ClickException(
-                f'Invalid package name: {package_name}, expected format: <package_name>==<package_version>'
-            )
-
-
-def _get_package_dir(package_name: str, package_version: str) -> str:
-    packages_dir = os.getenv('TIP_SITE_PACKAGES')
-    if packages_dir is None:
-        raise click.ClickException("TIP_SITE_PACKAGES environment variable is not set")
-    package_dir = os.path.join(packages_dir, package_name, package_version)
-    return package_dir
+    If ENVIRONMENT_PATH is specified, then packages are removed from it, otherwise activated environment is affected.
+    """
+    if (tip_dir := config.get('tip_dir')) is None:
+        raise click.ClickException("No user configuration found, run `tip init` first")
+    active_environment_name = config.get('active_environment_name')
+    environment_path = environment_path or environment.get_environment_path(tip_dir, active_environment_name)
+    for package_specifier in package_specifiers:
+        try:
+            environment.remove_from_environment_at_path(package_specifier, environment_path)
+        except KeyError as ex:
+            click.echo(f"Package {ex} not in environment")
+        except ValueError as ex:
+            click.echo(f"Specified version {package_specifier} not found, current version: {ex}")
