@@ -13,26 +13,26 @@ from tip.tip_meta_finder import TipMetaFinder
 
 
 def run_in_env(
-        module_name: str,
-        command: str,
-        tip_dir: str,
-        environment_name: str,
-        install_missing: bool,
-        args: tuple[str]
-    ):
+    module_name: str,
+    command: str,
+    tip_dir: str,
+    environment_name: str,
+    install_missing: bool,
+    args: tuple[str]
+):
     """Run given module, command or file using environment `environment_name`."""
     environment_path = environments.locate(tip_dir, environment_name)
     run(tip_dir, module_name, command, environment_path, install_missing, args)
 
 
 def run(
-        tip_dir: str,
-        module_name: str,
-        command: str,
-        environment_path: str | None,
-        install_missing: bool,
-        args: tuple[str]
-    ):
+    tip_dir: str,
+    module_name: str,
+    command: str,
+    environment_path: str | None,
+    install_missing: bool,
+    args: tuple[str]
+):
     """Run given module, command or file using environment at `environment_path`."""
     is_module_name_given = isinstance(module_name, str) and len(module_name) > 0
     is_command_given = isinstance(command, str) and len(command) > 0
