@@ -29,7 +29,7 @@ def install(tip_home: str, package_specifiers: list[str] | None = None, environm
             continue
         raise RuntimeError(f"Invalid package specifier: '{package_specifier}'")
     if environment_path is not None:
-        env = environments.get_environment_by_path(environment_path)
+        env = environments.read_environment_by_path(environment_path)
         env_package_specifiers = [f"{name}=={version}" for name, version in env.items()]
     else:
         env_package_specifiers = []

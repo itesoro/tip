@@ -9,7 +9,7 @@ def locate(tip_dir: str, name: str) -> str:
     return os.path.join(_get_environments_dir(tip_dir), f"{name}.json")
 
 
-def get_environment_by_path(path: str) -> dict:
+def read_environment_by_path(path: str) -> dict:
     """Get package list of the environment at `path`."""
     if not os.path.isfile(path):
         raise FileNotFoundError(f"Environment file is not found at {path}")
@@ -17,10 +17,10 @@ def get_environment_by_path(path: str) -> dict:
         return json.load(environment_file)
 
 
-def get_environment_by_name(tip_dir: str, name: str) -> dict:
+def read_environment_by_name(tip_dir: str, name: str) -> dict:
     """Get package list of the environment called `name`."""
     path = locate(tip_dir, name)
-    return get_environment_by_path(path)
+    return read_environment_by_path(path)
 
 
 def save_environment(environment: dict | None, path: str, /, *, rewrite: bool = False):
@@ -39,7 +39,7 @@ def exists(tip_dir: str, name: str) -> bool:
 
 def add_to_environment_at_path(package: str, path: str, replace: bool = False):
     """Add package to the environment file at `path`."""
-    environment = get_environment_by_path(path)
+    environment = read_environment_by_path(path)
     package_name, package_version = parse_package_specifier(package)
     if (curr_version := environment.get(package_name)) is not None:
         if curr_version == package_version:
@@ -58,7 +58,7 @@ def add_to_environment_with_name(tip_dir, package: str, environment_name: str, r
 
 def remove_from_environment_at_path(package_specifier: str, path: str):
     """Remove package from the environment file at `path`."""
-    environment = get_environment_by_path(path)
+    environment = read_environment_by_path(path)
     package_name, package_version = parse_package_specifier(package_specifier)
     if environment[package_name] != package_version:
         raise ValueError(package_version)

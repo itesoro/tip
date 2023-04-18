@@ -39,7 +39,7 @@ def run(
     is_python_file_path_given = not (is_module_name_given or is_command_given) and len(args) > 0
     if is_python_file_path_given:
         python_file_path = args[0]
-    env = environments.get_environment_by_path(environment_path) if environment_path is not None else {}
+    env = environments.read_environment_by_path(environment_path) if environment_path is not None else {}
     if install_missing:
         package_specifiers = [packages.make_package_specifier(name, version) for name, version in env.items()]
         packages.install(tip_dir, package_specifiers)

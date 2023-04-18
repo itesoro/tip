@@ -115,10 +115,10 @@ def _make_installed_packages_tree(tip_dir: str) -> rich.tree.Tree:
 
 def _make_environment_packages_tree(tip_dir: str, environment_name_or_path: str) -> rich.tree.Tree:
     try:
-        packages_info = environments.get_environment_by_name(tip_dir, environment_name_or_path)
+        packages_info = environments.read_environment_by_name(tip_dir, environment_name_or_path)
     except FileNotFoundError as ex:
         if os.path.isfile(environment_name_or_path):
-            packages_info = environments.get_environment_by_path(environment_name_or_path)
+            packages_info = environments.read_environment_by_path(environment_name_or_path)
         else:
             raise click.ClickException("Environment not found") from ex
     tree = rich.tree.Tree(environment_name_or_path)
@@ -196,7 +196,7 @@ def add(package_specifiers: tuple[str], environment_path: str | None, from_path:
     tip_dir = _get_tip_dir_or_raise(config)
     packages_to_add = []
     if from_path:
-        env = environments.get_environment_by_path(from_path)
+        env = environments.read_environment_by_path(from_path)
         for package_name, package_version in env.items():
             packages_to_add.append(f"{package_name}=={package_version}")
     packages_to_add.extend(package_specifiers)
