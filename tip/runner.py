@@ -7,28 +7,8 @@ from importlib.util import module_from_spec, spec_from_file_location
 
 import click
 
-from tip.config import pass_config
-from tip import environment, packages
+from tip import environments, packages
 from tip.tip_meta_finder import TipMetaFinder
-
-
-@click.command()
-@click.option('-m', '--module', 'module_name', type=str)
-@click.option('-c', 'command')
-@click.option('--install-missing', 'install_missing', is_flag=True)
-@click.argument('args', nargs=-1, type=click.UNPROCESSED)
-@pass_config
-def tipython(module_name: str, command: str, install_missing: bool, args: tuple[str], config):
-    """
-    Run a module, file, or command with access to all packages installed in the current TIP installation.
-
-    The common use case for this utility is as a VSCode interpreter. Instead of creating multiple executables for each
-    environment, this single utility can access all the packages.
-    """
-    if (tip_dir := config.get('tip_dir')) is None:
-        raise click.ClickException("The configuration is corrupted; consider reinstalling tip")
-    sys.path.insert(0, packages.get_links_dir(tip_dir))
-    return run(tip_dir, module_name, command, None, install_missing, args)
 
 
 def run_in_env(
@@ -40,7 +20,7 @@ def run_in_env(
         args: tuple[str]
     ):
     """Run given module, command or file using environment `environment_name`."""
-    environment_path = environment.get_environment_by_name(tip_dir, environment_name)
+    environment_path = environments.get_environment_by_name(tip_dir, environment_name)
     run(tip_dir, module_name, command, environment_path, install_missing, args)
 
 
@@ -58,7 +38,7 @@ def run(
     is_python_file_path_given = not (is_module_name_given or is_command_given) and len(args) > 0
     if is_python_file_path_given:
         python_file_path = args[0]
-    env = environment.get_environment_by_path(environment_path) if environment_path is not None else {}
+    env = environments.get_environment_by_path(environment_path) if environment_path is not None else {}
     if install_missing:
         package_specifiers = [packages.make_package_specifier(name, version) for name, version in env.items()]
         packages.install(tip_dir, package_specifiers)

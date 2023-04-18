@@ -5,8 +5,8 @@ package and to use it in different environments.
 
 ## Installation
 
-Install this package using `pip install`. It will create [TIP Directory](#glossary) `~/tip`, but if you want to override
-its path set it in `TIP_DIR` environment variable.
+Install this package using `pip install`. It will create [TIP Directory](#glossary) `~/.tip`, but if you want to
+override its path set it in `TIP_DIR` environment variable.
 
 ## Usage
 

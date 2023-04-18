@@ -1,10 +1,11 @@
 import os
+import copy
 import json
 import inspect
 import functools
 
 
-TIP_CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".tip")
+TIP_CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".tip_config")
 
 
 def pass_config(fn):
@@ -12,8 +13,10 @@ def pass_config(fn):
     @functools.wraps(fn)
     def wrapper(*args, **kwargs):
         config_dict = _load_config_dict()
+        stored_config = copy.deepcopy(config_dict)
         res = fn(*args, **kwargs, config=Config(config_dict))
-        _dump_config_dict(config_dict)
+        if config_dict != stored_config:
+            _dump_config_dict(config_dict)
         return res
     return wrapper
 

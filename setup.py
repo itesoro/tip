@@ -3,7 +3,7 @@ from setuptools import setup
 
 
 def create_tip_dir():
-    tip_dir = os.getenv('TIP_DIR') or os.path.join(os.path.expanduser('~'), 'tip')
+    tip_dir = os.path.expanduser(os.getenv('TIP_DIR', os.path.join('~', '.tip')))
     os.makedirs(tip_dir, exist_ok=True)
     return tip_dir
 
@@ -20,10 +20,10 @@ def init_config(tip_dir):
 
 
 def ensure_base_exists(tip_dir):
-    from tip import environment
-    base_path = environment.get_environment_path(tip_dir, "base")
+    from tip import environments
+    base_path = environments.locate(tip_dir, "base")
     if not os.path.exists(base_path):
-        environment.save_environment({}, base_path)
+        environments.save_environment({}, base_path)
 
 
 tip_dir = create_tip_dir()

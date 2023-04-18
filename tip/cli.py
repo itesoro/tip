@@ -1,11 +1,12 @@
 import os
+import sys
 
 import click
 import rich
 import rich.tree
 
 from tip.config import pass_config
-from tip import environment, packages, runner
+from tip import environments, packages, runner
 
 
 
@@ -20,7 +21,7 @@ def app():
 def activate(environment_name: str, config):
     """Make environment ENVIRONMENT_NAME active."""
     tip_dir = _get_tip_home_or_raise(config)
-    environment_path = environment.get_environment_path(tip_dir, environment_name)
+    environment_path = environments.locate(tip_dir, environment_name)
     if not os.path.isfile(environment_path):
         raise click.ClickException(f"Environment {environment_name} doesn't exist")
     config['active_environment_name'] = environment_name
@@ -32,7 +33,7 @@ def info(config):
     """Display information about current tip environment."""
     tip_dir = _get_tip_home_or_raise(config)
     active_env_name = config.get('active_environment_name')
-    active_env_path = environment.get_environment_path(tip_dir, active_env_name)
+    active_env_path = environments.locate(tip_dir, active_env_name)
     click.echo(f"active env: {active_env_name}")
     click.echo(f"active env location: {active_env_path}")
     click.echo(f"TIP directory: {tip_dir}")
@@ -47,11 +48,11 @@ def install(package_specifiers: tuple[str], environment_path: str | None, config
     tip_dir = _get_tip_home_or_raise(config)
     active_environment_name = config.get('active_environment_name')
     if environment_path is None:
-        environment_path = environment.get_environment_path(tip_dir, active_environment_name)
+        environment_path = environments.locate(tip_dir, active_environment_name)
     try:
         packages.install(tip_dir, package_specifiers, environment_path)
         for package_specifier in package_specifiers:
-            environment.add_to_environment_with_name(tip_dir, package_specifier, active_environment_name, replace=True)
+            environments.add_to_environment_with_name(tip_dir, package_specifier, active_environment_name, replace=True)
     except Exception as ex:
         raise click.ClickException(ex)
 
@@ -100,14 +101,14 @@ def list_(is_active_env: bool, environment_name_or_path: str | None, config):
         if is_active_env:
             active_environment_name = config.get('active_environment_name')
             tree = rich.tree.Tree(active_environment_name)
-            packages_info = environment.get_environment_by_name(tip_dir, active_environment_name)
+            packages_info = environments.get_environment_by_name(tip_dir, active_environment_name)
         else:
             tree = rich.tree.Tree(environment_name_or_path)
             try:
-                packages_info = environment.get_environment_by_name(tip_dir, environment_name_or_path)
+                packages_info = environments.get_environment_by_name(tip_dir, environment_name_or_path)
             except FileNotFoundError:
                 if os.path.isfile(environment_name_or_path):
-                    packages_info = environment.get_environment_by_path(environment_name_or_path)
+                    packages_info = environments.get_environment_by_path(environment_name_or_path)
                 else:
                     raise click.ClickException("Environment not found")
         packages_info = {k: [v] for k, v in packages_info.items()}
@@ -138,8 +139,31 @@ def run(module_name: str, command: str, environment_path: str, install_missing: 
     tip_dir = _get_tip_home_or_raise(config)
     if environment_path is None:
         active_environment_name = config.get('active_environment_name')
-        environment_path = environment.get_environment_path(tip_dir, active_environment_name)
+        environment_path = environments.locate(tip_dir, active_environment_name)
     return runner.run(tip_dir, module_name, command, environment_path, install_missing, args)
+
+
+@click.command()
+@click.option('-m', '--module', 'module_name', type=str)
+@click.option('-c', 'command')
+@click.option('--install-missing', 'install_missing', is_flag=True)
+@click.argument('args', nargs=-1, type=click.UNPROCESSED)
+@pass_config
+def tipython(module_name: str, command: str, install_missing: bool, args: tuple[str], config):
+    """
+    Run a module, file, or command with access to all packages installed in the current TIP installation.
+
+    The common use case for this utility is as a VSCode interpreter. Instead of creating multiple executables for each
+    environment, this single utility can access all the packages.
+    """
+    # if (tip_dir := config.get('tip_dir')) is None:
+    #     raise click.ClickException("The configuration is corrupted; consider reinstalling tip")
+    ee = os.environ
+    what_user = os.getenv('WHAT_USER')
+    tip_dir = os.getenv('TIP_DIR')
+    assert tip_dir is not None, f"TIP dir is not found, I'm {what_user}"
+    sys.path.insert(0, packages.get_links_dir(tip_dir))
+    return runner.run(tip_dir, module_name, command, None, install_missing, args)
 
 
 @app.command()
@@ -148,9 +172,9 @@ def run(module_name: str, command: str, environment_path: str, install_missing: 
 def create(environment_name: str, config):
     """Create new environment."""
     tip_dir = _get_tip_home_or_raise(config)
-    path = environment.get_environment_path(tip_dir, environment_name)
+    path = environments.locate(tip_dir, environment_name)
     try:
-        environment.save_environment(None, path)
+        environments.save_environment(None, path)
     except RuntimeError as ex:
         raise click.ClickException(ex)
 
@@ -173,14 +197,14 @@ def add(package_specifiers: tuple[str], environment_path: str | None, from_path:
     tip_dir = _get_tip_home_or_raise(config)
     packages_to_add = []
     if from_path:
-        env = environment.get_environment_by_path(from_path)
+        env = environments.get_environment_by_path(from_path)
         for package_name, package_version in env.items():
             packages_to_add.append(f"{package_name}=={package_version}")
     packages_to_add.extend(package_specifiers)
     active_environment_name = config.get('active_environment_name')
-    environment_path = environment_path or environment.get_environment_path(tip_dir, active_environment_name)
+    environment_path = environment_path or environments.locate(tip_dir, active_environment_name)
     for package_specifier in packages_to_add:
-        environment.add_to_environment_at_path(package_specifier, environment_path, replace=True)
+        environments.add_to_environment_at_path(package_specifier, environment_path, replace=True)
 
 
 @app.command()
@@ -195,10 +219,10 @@ def remove(package_specifiers: tuple[str], environment_path: str | None, config)
     """
     tip_dir = _get_tip_home_or_raise(config)
     active_environment_name = config.get('active_environment_name')
-    environment_path = environment_path or environment.get_environment_path(tip_dir, active_environment_name)
+    environment_path = environment_path or environments.locate(tip_dir, active_environment_name)
     for package_specifier in package_specifiers:
         try:
-            environment.remove_from_environment_at_path(package_specifier, environment_path)
+            environments.remove_from_environment_at_path(package_specifier, environment_path)
         except KeyError as ex:
             click.echo(f"Package {ex} not in environment")
         except ValueError as ex:
