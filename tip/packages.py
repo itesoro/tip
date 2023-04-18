@@ -3,29 +3,21 @@ import shutil
 import subprocess
 
 from tip import environments
-
-
-def parse(package_specifier: str) -> tuple[str, str]:
-    """Parse package specifier into package name and package version."""
-    try:
-        name, version = package_specifier.split('==')
-    except ValueError as ex:
-        raise ValueError("Package specifier must be '<package_name>==<package_version>'") from ex
-    return name, version
+from tip.util import parse_package_specifier
 
 
 def is_valid(package_specifier: str) -> bool:
     """Check if `package` is valid package specifier."""
     try:
-        parse(package_specifier)
+        parse_package_specifier(package_specifier)
     except ValueError:
         return False
     return True
 
 
 def make_package_specifier(package_name: str, package_version: str) -> str:
-        """Make package specifier from package name and package version."""
-        return f"{package_name}=={package_version}"
+    """Make package specifier from package name and package version."""
+    return f"{package_name}=={package_version}"
 
 
 def install(tip_home: str, package_specifiers: list[str] | None = None, environment_path: str | None = None):
@@ -48,7 +40,7 @@ def install(tip_home: str, package_specifiers: list[str] | None = None, environm
 
 def missing_packages(tip_home: str, environment: dict) -> list[str]:
     """Get list of not yet installed packages for environment."""
-    missing_packages = []
+    missing_packages = []  # pylint: disable=redefined-outer-name
     for package_name, package_version in environment.items():
         package_specifier = make_package_specifier(package_name, package_version)
         if not is_installed(tip_home, package_specifier):
@@ -84,7 +76,7 @@ def is_installed(tip_home: str, package_specifier: str) -> bool:
 
 def locate(tip_home: str, package: str) -> str:
     """Find package directory path."""
-    package_name, package_version = parse(package)
+    package_name, package_version = parse_package_specifier(package)
     packages_dir = get_site_packages_dir(tip_home)
     os.makedirs(packages_dir, exist_ok=True)
     package_dir = os.path.join(packages_dir, package_name, package_version)

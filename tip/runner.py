@@ -3,8 +3,8 @@ import sys
 import code
 import importlib
 import contextlib
-from typing import Any, no_type_check
 from importlib.util import module_from_spec, spec_from_file_location
+from typing import Any, no_type_check
 
 import click
 

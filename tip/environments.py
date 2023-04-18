@@ -1,7 +1,7 @@
 import os
 import json
 
-from . import packages
+from tip.util import parse_package_specifier
 
 
 def locate(tip_dir: str, name: str) -> str:
@@ -40,7 +40,7 @@ def exists(tip_dir: str, name: str) -> bool:
 def add_to_environment_at_path(package: str, path: str, replace: bool = False):
     """Add package to the environment file at `path`."""
     environment = get_environment_by_path(path)
-    package_name, package_version = packages.parse(package)
+    package_name, package_version = parse_package_specifier(package)
     if (curr_version := environment.get(package_name)) is not None:
         if curr_version == package_version:
             return
@@ -59,7 +59,7 @@ def add_to_environment_with_name(tip_dir, package: str, environment_name: str, r
 def remove_from_environment_at_path(package_specifier: str, path: str):
     """Remove package from the environment file at `path`."""
     environment = get_environment_by_path(path)
-    package_name, package_version = packages.parse(package_specifier)
+    package_name, package_version = parse_package_specifier(package_specifier)
     if environment[package_name] != package_version:
         raise ValueError(package_version)
     del environment[package_name]

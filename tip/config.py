@@ -86,7 +86,7 @@ class Config:
 def _load_config_dict():
     config = {}
     try:
-        with open(TIP_CONFIG_PATH) as f:
+        with open(TIP_CONFIG_PATH, mode='r', encoding='utf8') as f:
             config = json.load(f)
     except (FileNotFoundError, json.decoder.JSONDecodeError):
         pass
@@ -94,5 +94,5 @@ def _load_config_dict():
 
 
 def _dump_config_dict(config):
-    with open(TIP_CONFIG_PATH, 'w') as f:
+    with open(TIP_CONFIG_PATH, mode='w', encoding='utf8') as f:
         json.dump(config, f, indent=2)
