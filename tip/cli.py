@@ -1,13 +1,12 @@
 import os
 import sys
 
-import click
 import rich
+import click
 import rich.tree
 
-from tip.config import pass_config
 from tip import environments, packages, runner
-
+from tip.config import pass_config
 
 
 @click.group()
