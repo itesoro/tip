@@ -1,4 +1,6 @@
+# pylint: disable=redefined-outer-name
 import os
+
 from setuptools import setup
 
 
@@ -16,7 +18,7 @@ def init_config(tip_dir):
         config['tip_dir'] = tip_dir
         config['active_environment_name'] = config.get('active_environment_name', 'base')
 
-    _init_config(tip_dir)
+    _init_config(tip_dir)  # pylint: disable=no-value-for-parameter
 
 
 def ensure_base_exists(tip_dir):
