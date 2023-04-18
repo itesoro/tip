@@ -12,11 +12,11 @@ override its path set it in `TIP_DIR` environment variable.
 
 TIP has several commands:
 
-- `add` new package by it's package specifier to the current environment (or specify environment using `-e`)
+- `add` new package by it's package specifier to the environment
 - `create` create new environment
 - `install` download, install and add package(-s) so it's can be used within environment
-- `list` print installed packages and their versions
-- `run` is used as `python` command except it uses active environment to import hook packages added into it
+- `list` installed or added packages and their versions
+- `run` is used as `python` command with ability to import packages added to the environment
 - `uninstall` removes previously installed package(-s)
 - `info` current installation and environment info
 
