@@ -3,6 +3,7 @@ import copy
 import json
 import inspect
 import functools
+from typing import Any
 
 
 TIP_CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".tip_config")
@@ -51,7 +52,7 @@ class Config:
 
     def __init__(self, config_dict: dict):
         self._root = config_dict
-        self._tmp_root = {}
+        self._tmp_root: dict[str, Any] = {}
 
     def get(self, key, default_value=None):
         x = self.__get_root(key)

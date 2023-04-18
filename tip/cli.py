@@ -1,5 +1,6 @@
 import os
 import sys
+from typing import no_type_check
 
 import rich
 import click
@@ -42,7 +43,7 @@ def info(config):
 @click.option('--env', '-e', 'environment_path', type=str, default=None)
 @click.argument('package_specifiers', type=str, nargs=-1)
 @pass_config
-def install(package_specifiers: tuple[str], environment_path: str | None, config):
+def install(package_specifiers: list[str], environment_path: str | None, config):
     """Download and install packages by PACKAGE_SPECIFIERS to make them runnable with `tip run`."""
     tip_dir = _get_tip_home_or_raise(config)
     active_environment_name = config.get('active_environment_name')
@@ -53,7 +54,7 @@ def install(package_specifiers: tuple[str], environment_path: str | None, config
         for package_specifier in package_specifiers:
             environments.add_to_environment_with_name(tip_dir, package_specifier, active_environment_name, replace=True)
     except Exception as ex:
-        raise click.ClickException(ex)
+        raise click.ClickException(str(ex))
 
 
 @app.command()
@@ -78,6 +79,7 @@ def uninstall(package_specifiers: tuple[str], config):
 @click.option('--active-env', '-a', 'is_active_env', is_flag=True)
 @click.argument("environment_name_or_path", type=str, required=False, default=None)
 @pass_config
+@no_type_check
 def list_(is_active_env: bool, environment_name_or_path: str | None, config):
     """
     Show added or installed packages.
@@ -175,7 +177,7 @@ def create(environment_name: str, config):
     try:
         environments.save_environment(None, path)
     except RuntimeError as ex:
-        raise click.ClickException(ex)
+        raise click.ClickException(ex)  # type: ignore
 
 
 @app.command()

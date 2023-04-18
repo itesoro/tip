@@ -7,10 +7,11 @@ from tip import environments
 
 def parse(package_specifier: str) -> tuple[str, str]:
     """Parse package specifier into package name and package version."""
-    split = package_specifier.split('==')
-    if len(split) != 2:
-        raise ValueError("Package specifier must be '<package_name>==<package_version>'")
-    return split
+    try:
+        name, version = package_specifier.split('==')
+    except ValueError as ex:
+        raise ValueError("Package specifier must be '<package_name>==<package_version>'") from ex
+    return name, version
 
 
 def is_valid(package_specifier: str) -> bool:
@@ -27,7 +28,7 @@ def make_package_specifier(package_name: str, package_version: str) -> str:
         return f"{package_name}=={package_version}"
 
 
-def install(tip_home: str, package_specifiers: tuple[str] | None = None, environment_path: str = None):
+def install(tip_home: str, package_specifiers: list[str] | None = None, environment_path: str | None = None):
     """Install packages from `package_specifiers` and/or from environment."""
     if package_specifiers is None:
         package_specifiers = []

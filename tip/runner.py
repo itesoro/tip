@@ -3,6 +3,7 @@ import sys
 import code
 import importlib
 import contextlib
+from typing import Any, no_type_check
 from importlib.util import module_from_spec, spec_from_file_location
 
 import click
@@ -20,7 +21,7 @@ def run_in_env(
         args: tuple[str]
     ):
     """Run given module, command or file using environment `environment_name`."""
-    environment_path = environments.get_environment_by_name(tip_dir, environment_name)
+    environment_path = environments.locate(tip_dir, environment_name)
     run(tip_dir, module_name, command, environment_path, install_missing, args)
 
 
@@ -51,12 +52,13 @@ def run(
     elif is_module_name_given:
         _run_module(module_name, args)
     elif is_command_given:
-        ns = {}
+        ns: dict[str, Any] = {}
         exec(command, ns, ns)
     else:
         code.InteractiveConsole(locals=globals()).interact()
 
 
+@no_type_check
 def _run_module(name: str, args):
     module_name = "__main__"
     with _disable_pycache():
@@ -69,6 +71,7 @@ def _run_module(name: str, args):
         main_spec.loader.exec_module(main_module)
 
 
+@no_type_check
 def _run_file(filename: str, args):
     module_name = "__main__"
     sys.argv = list(args)
