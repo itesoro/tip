@@ -62,9 +62,19 @@ def ensure_base_exists():
         environments.save_environment({}, base_path)
 
 
-def make_scripts():
+def prepare_scripts():
     _make_script('tip')
     _make_script('tipython')
+    _add_tip_to_path()
+
+
+def _add_tip_to_path():
+    import tip
+    rcfile_path = tip.shell.find_rcfile_path()
+    if rcfile_path is None:
+        return
+    with tip.shell.patch_config(rcfile_path) as tip_shell_config:
+        tip_shell_config.write(f'export PATH={TIP_DIR}/bin:$PATH')
 
 
 def _make_script(entrypoint):
@@ -80,4 +90,4 @@ os.makedirs(TIP_DIR, exist_ok=True)
 setup()
 init_config()
 ensure_base_exists()
-make_scripts()
+prepare_scripts()
