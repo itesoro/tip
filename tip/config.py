@@ -1,25 +1,16 @@
 import os
-import copy
+import sys
 import json
+import atexit
 import inspect
-import functools
 from typing import Any
 
 
-TIP_CONFIG_PATH = os.path.join(os.path.expanduser("~"), ".tip_config")
-
-
-def pass_config(fn):
-    """Pass config to the function."""
-    @functools.wraps(fn)
-    def wrapper(*args, **kwargs):
-        config_dict = _load_config_dict()
-        stored_config = copy.deepcopy(config_dict)
-        res = fn(*args, **kwargs, config=Config(config_dict))
-        if config_dict != stored_config:
-            _dump_config_dict(config_dict)
-        return res
-    return wrapper
+BIN_DIR = os.path.dirname(sys.argv[0])
+TIP_DIR = os.path.dirname(BIN_DIR)
+LINKS_DIR = os.path.join(TIP_DIR, "links")
+ENVIRONMENTS_DIR = os.path.join(TIP_DIR, "environments")
+CONFIG_PATH = os.path.join(TIP_DIR, "config.json")
 
 
 class Config:
@@ -83,10 +74,20 @@ class Config:
         return self._tmp_root if key.startswith('_') else self._root
 
 
+def get(key, default_value=None):
+    """Get a configuration value."""
+    return _config.get(key, default_value)
+
+
+def set_value(key, value):
+    """Set a configuration value."""
+    _config[key] = value
+
+
 def _load_config_dict():
     config = {}
     try:
-        with open(TIP_CONFIG_PATH, mode='r', encoding='utf8') as f:
+        with open(CONFIG_PATH, mode='r', encoding='utf8') as f:
             config = json.load(f)
     except (FileNotFoundError, json.decoder.JSONDecodeError):
         pass
@@ -94,5 +95,10 @@ def _load_config_dict():
 
 
 def _dump_config_dict(config):
-    with open(TIP_CONFIG_PATH, mode='w', encoding='utf8') as f:
+    with open(CONFIG_PATH, mode='w', encoding='utf8') as f:
         json.dump(config, f, indent=2)
+
+
+_config_dict = _load_config_dict()
+_config = Config(_config_dict)
+atexit.register(_dump_config_dict, _config_dict)

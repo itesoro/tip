@@ -8,28 +8,15 @@ from typing import Any, no_type_check
 
 import click
 
-from tip import environments, packages
+from tip import packages
+from tip.environment import Environment
 from tip.tip_meta_finder import TipMetaFinder
 
 
-def run_in_env(
-    module_name: str,
-    command: str,
-    tip_dir: str,
-    environment_name: str,
-    install_missing: bool,
-    args: tuple[str]
-):
-    """Run given module, command or file using environment `environment_name`."""
-    environment_path = environments.locate(tip_dir, environment_name)
-    run(tip_dir, module_name, command, environment_path, install_missing, args)
-
-
 def run(
-    tip_dir: str,
     module_name: str,
     command: str,
-    environment_path: str | None,
+    env: Environment | None,
     install_missing: bool,
     args: tuple[str]
 ):
@@ -39,11 +26,12 @@ def run(
     is_python_file_path_given = not (is_module_name_given or is_command_given) and len(args) > 0
     if is_python_file_path_given:
         python_file_path = args[0]
-    env = environments.read_environment_by_path(environment_path) if environment_path is not None else {}
     if install_missing:
-        package_specifiers = [packages.make_package_specifier(name, version) for name, version in env.items()]
-        packages.install(tip_dir, package_specifiers)
-    packages_to_folders = _map_packages_to_folders(tip_dir, env)
+        if env is None:
+            raise RuntimeError("Can't install missing packages because environment is not provided")
+        package_specifiers = [packages.make_package_specifier(name, version) for name, version in env.packages.items()]
+        packages.install(package_specifiers)
+    packages_to_folders = _map_packages_to_folders(env)
     finder = TipMetaFinder(packages_to_folders)
     sys.meta_path.insert(0, finder)
     _remove_external_imports()
@@ -102,12 +90,14 @@ def _disable_pycache():
         sys.dont_write_bytecode = old_dont_write_bytecode
 
 
-def _map_packages_to_folders(tip_dir: str, env: dict) -> dict:
-    packages_to_folders = {}
-    for package_name, package_version in env.items():
-        package_dir = packages.locate(tip_dir, f"{package_name}=={package_version}")
+def _map_packages_to_folders(env: Environment | None) -> dict[str, str]:
+    packages_to_folders: dict[str, str] = {}
+    if env is None:
+        return packages_to_folders
+    for name, version in env.packages.items():
+        package_dir = packages.locate(name, version)
         if not os.path.isdir(package_dir):
-            raise click.ClickException(f"Package '{package_name}=={package_version}' is not installed")
+            raise click.ClickException(f"Package '{name}=={version}' is not installed")
         package_files = os.listdir(package_dir)
         package_subpackages = [entry.removesuffix('.py') for entry in package_files
                                if _is_package_or_module(os.path.join(package_dir, entry))]

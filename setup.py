@@ -1,6 +1,7 @@
 # pylint: disable=redefined-outer-name
 import os
 import sys
+import json
 import stat
 
 from setuptools import setup
@@ -45,21 +46,25 @@ if __name__ == '__main__':
 
 
 def init_config():
-    from tip.config import pass_config
-
-    @pass_config
-    def _init_config(config):
-        config['tip_dir'] = TIP_DIR
-        config['active_environment_name'] = config.get('active_environment_name', 'base')
-
-    _init_config()  # pylint: disable=no-value-for-parameter
+    config_path = os.path.join(TIP_DIR, "config.json")
+    if os.path.exists(config_path):
+        return
+    config = {
+        'site_packages_dir': os.path.join(TIP_DIR, 'site-packages'),
+        'active_environment_name': 'base'
+    }
+    with open(config_path, mode='w+', encoding='utf8') as config_file:
+        json.dump(config, config_file)
 
 
 def ensure_base_exists():
-    from tip import environments
-    base_path = environments.locate(TIP_DIR, "base")
-    if not os.path.exists(base_path):
-        environments.save_environment({}, base_path)
+    environments_dir = os.path.join(TIP_DIR, 'environments')
+    os.makedirs(environments_dir, exist_ok=True)
+    base_env_path = os.path.join(environments_dir, 'base.json')
+    if os.path.exists(base_env_path):
+        return
+    with open(base_env_path, mode='w+', encoding='utf8') as base_env:
+        json.dump({}, base_env)
 
 
 def prepare_scripts():

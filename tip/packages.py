@@ -2,7 +2,7 @@ import os
 import shutil
 import subprocess
 
-from tip import environments
+from tip import config
 from tip.util import parse_package_specifier
 
 
@@ -20,93 +20,51 @@ def make_package_specifier(package_name: str, package_version: str) -> str:
     return f"{package_name}=={package_version}"
 
 
-def install(tip_home: str, package_specifiers: list[str] | None = None, environment_path: str | None = None):
-    """Install packages from `package_specifiers` and/or from environment."""
-    if package_specifiers is None:
-        package_specifiers = []
+def install(package_specifiers: list[str]):
+    """Install packages identified by `package_specifiers`."""
     for package_specifier in package_specifiers:
         if is_valid(package_specifier):
             continue
         raise RuntimeError(f"Invalid package specifier: '{package_specifier}'")
-    if environment_path is not None:
-        env = environments.read_environment_by_path(environment_path)
-        env_package_specifiers = [f"{name}=={version}" for name, version in env.items()]
-    else:
-        env_package_specifiers = []
-    package_specifiers = list(package_specifiers) + env_package_specifiers
     for package_specifier in package_specifiers:
-        _install(tip_home, package_specifier)
+        _install(package_specifier)
 
 
-def missing_packages(tip_home: str, environment: dict) -> list[str]:
-    """Get list of not yet installed packages for environment."""
-    missing_packages = []  # pylint: disable=redefined-outer-name
-    for package_name, package_version in environment.items():
-        package_specifier = make_package_specifier(package_name, package_version)
-        if not is_installed(tip_home, package_specifier):
-            missing_packages.append(package_specifier)
-    return missing_packages
-
-
-def make_link(tip_home: str, package_specifier: str):
-    """Creates link to a package conent within `site-packages` directory."""
-    package_dir = locate(tip_home, package_specifier)
-    links_dir = get_links_dir(tip_home)
+def make_link(package_specifier: str):
+    """Make link to package identified by `package_specifier` in links directory."""
+    package_dir = locate(*parse_package_specifier(package_specifier))
     for folder_name in os.listdir(package_dir):
         folder_path = os.path.join(package_dir, folder_name)
-        link_path = os.path.join(links_dir, folder_name)
+        link_path = os.path.join(config.LINKS_DIR, folder_name)
         if os.path.exists(link_path):
             os.unlink(link_path)
         os.symlink(folder_path, link_path)
 
 
-def get_links_dir(tip_home: str) -> str:
-    """Get path to directory containing links to all installed packages."""
-    links_dir = os.path.join(tip_home, "package-links")
-    if not os.path.isdir(links_dir):
-        os.makedirs(links_dir)
-    return links_dir
-
-
-def is_installed(tip_home: str, package_specifier: str) -> bool:
-    """Check if package is installed."""
-    package_dir = locate(tip_home, package_specifier)
+def is_installed(package_specifier: str) -> bool:
+    """Check if package identified by `package_specifier` is installed."""
+    package_dir = locate(*parse_package_specifier(package_specifier))
     return os.path.isdir(package_dir)
 
 
-def locate(tip_home: str, package: str) -> str:
-    """Find package directory path."""
-    package_name, package_version = parse_package_specifier(package)
-    packages_dir = get_site_packages_dir(tip_home)
-    os.makedirs(packages_dir, exist_ok=True)
-    package_dir = os.path.join(packages_dir, package_name, package_version)
+def locate(package_name: str, package_version: str) -> str:
+    """Locate package identified by `package_name` and `package_version` in site-packages directory."""
+    site_packages_dir = config.get('site_packages_dir')
+    os.makedirs(site_packages_dir, exist_ok=True)
+    package_dir = os.path.join(site_packages_dir, package_name, package_version)
     return package_dir
 
 
-def uninstall(tip_home: str, package_specifier: str):
-    """Uninstall package."""
-    package_dir = locate(tip_home, package_specifier)
+def uninstall(package_specifier: str):
+    """Uninstall package identified by `package_specifier`."""
+    package_dir = locate(*parse_package_specifier(package_specifier))
     shutil.rmtree(package_dir)
 
 
-def get_package_dir(tip_home: str, package_name: str, package_version: str) -> str:
-    """Get path to the package by it's name and version."""
-    packages_dir = get_site_packages_dir(tip_home)
-    package_dir = os.path.join(packages_dir, package_name, package_version)
-    return package_dir
-
-
-def get_site_packages_dir(tip_home) -> str:
-    """Get path to directory containg sources of all installed packages."""
-    packages_dir = os.path.join(tip_home, "site-packages")
-    if not os.path.isdir(packages_dir):
-        os.makedirs(packages_dir)
-    return packages_dir
-
-
-def _install(tip_home: str, package_specifier: str):
+def _install(package_specifier: str):
     """Install new package identified by `package_specifier` to make it available for environments."""
-    package_dir = locate(tip_home, package_specifier)
+    package_name, package_version = parse_package_specifier(package_specifier)
+    package_dir = locate(package_name, package_version)
     if os.path.exists(package_dir):
         return
     os.makedirs(package_dir)
@@ -116,4 +74,4 @@ def _install(tip_home: str, package_specifier: str):
     except Exception as ex:
         shutil.rmtree(package_dir)
         raise RuntimeError(f"Error while installing package '{package_specifier}'") from ex
-    make_link(tip_home, package_specifier)
+    make_link(package_specifier)
