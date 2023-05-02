@@ -40,5 +40,5 @@ class Environment:
         """Remove a package from the environment."""
         name, version = parse_package_specifier(package_specifier)
         if self.packages.get(name) != version:
-            raise ValueError(f"Package '{package_specifier}' is not installed")
+            raise ValueError(f"Package {package_specifier!r}' is not installed")
         self.packages.pop(name)

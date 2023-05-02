@@ -22,7 +22,7 @@ def activate(environment_name: str):
     """Make environment ENVIRONMENT_NAME active."""
     environment_path = Environment.locate(environment_name)
     if not os.path.isfile(environment_path):
-        raise click.ClickException(f"Environment {environment_name} doesn't exist")
+        raise click.ClickException(f"Environment {environment_name!r} doesn't exist")
     config['active_environment_name'] = environment_name  # pylint: disable=unsupported-assignment-operation
 
 
@@ -62,9 +62,9 @@ def uninstall(package_specifiers: tuple[str]):
     existing_package_specifiers = []
     for package_specifier in package_specifiers:
         if not packages.is_valid(package_specifier):
-            raise click.ClickException(f"Incorrect package specifier {package_specifier}")
+            raise click.ClickException(f"Incorrect package specifier {package_specifier!r}")
         if not packages.is_installed(package_specifier):
-            click.echo(f"Package '{package_specifier}' is not installed, skipping")
+            click.echo(f"Package {package_specifier!r} is not installed, skipping")
         else:
             existing_package_specifiers.append(package_specifier)
     for package_specifier in existing_package_specifiers:
@@ -181,9 +181,9 @@ def remove(package_specifiers: tuple[str], environment_path: str | None):
         try:
             env.remove_package(package_specifier)
         except KeyError:
-            click.echo(f"Package {package_specifier} not in environment")
+            click.echo(f"Package {package_specifier!r} not in environment")
         except ValueError:
-            click.echo(f"Package {package_specifier} is in environment with different version")
+            click.echo(f"Package {package_specifier!r} is in environment with different version")
 
 
 def _at_most_one(*args: bool) -> bool:

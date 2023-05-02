@@ -25,7 +25,7 @@ def install(package_specifiers: list[str]):
     for package_specifier in package_specifiers:
         if is_valid(package_specifier):
             continue
-        raise RuntimeError(f"Invalid package specifier: '{package_specifier}'")
+        raise RuntimeError(f"Invalid package specifier: {package_specifier!r}")
     for package_specifier in package_specifiers:
         _install(package_specifier)
 
@@ -73,5 +73,5 @@ def _install(package_specifier: str):
         subprocess.check_output(command, shell=True)
     except Exception as ex:
         shutil.rmtree(package_dir)
-        raise RuntimeError(f"Error while installing package '{package_specifier}'") from ex
+        raise RuntimeError(f"Error while installing package {package_specifier!r}") from ex
     make_link(package_specifier)
