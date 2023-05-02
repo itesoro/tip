@@ -9,8 +9,8 @@ class Environment:
     """A TIP environment."""
 
     def __init__(self, *, path: str, packages: dict = None):
-        self.packages = packages
         self._path = path
+        self.packages = packages or {}
 
     @staticmethod
     def load(path=None, *, name=None):
