@@ -23,7 +23,7 @@ def activate(environment_name: str):
     environment_path = Environment.locate(environment_name)
     if not os.path.isfile(environment_path):
         raise click.ClickException(f"Environment {environment_name} doesn't exist")
-    config.set_value('active_environment_name', environment_name)
+    config['active_environment_name'] = environment_name  # pylint: disable=unsupported-assignment-operation
 
 
 @app.command()

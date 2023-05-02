@@ -3,6 +3,8 @@ import sys
 import json
 import atexit
 import inspect
+import functools
+from types import ModuleType
 from typing import Any
 
 
@@ -79,11 +81,6 @@ def get(key, default_value=None):
     return _config.get(key, default_value)
 
 
-def set_value(key, value):
-    """Set a configuration value."""
-    _config[key] = value
-
-
 def _load_config_dict():
     config = {}
     try:
@@ -99,6 +96,23 @@ def _dump_config_dict(config):
         json.dump(config, f, indent=2)
 
 
+def _enable_setkey():
+    """Enable magic methods for Config."""
+    this_module = sys.modules[__name__]
+
+    @functools.wraps(ModuleType, updated=())
+    class MagicModule(ModuleType):
+        """Tricks module to have class-like functions."""
+
+    def config_setkey(self, key, value):  # pylint: disable=unused-argument
+        _config[key] = value
+
+    setattr(MagicModule, "__setitem__", config_setkey)
+
+    this_module.__class__ = MagicModule
+
+
 _config_dict = _load_config_dict()
 _config = Config(_config_dict)
+_enable_setkey()
 atexit.register(_dump_config_dict, _config_dict)
