@@ -1,5 +1,4 @@
 import os
-
 from importlib.abc import MetaPathFinder
 from importlib.util import spec_from_file_location
 
@@ -11,6 +10,7 @@ class TipMetaFinder(MetaPathFinder):
         self.packages_to_mount = packages_to_mount
 
     def find_spec(self, fullname, path, target=None):
+        # pylint: disable=unused-argument
         path = []
         if fullname in self.packages_to_mount:
             path.append(self.packages_to_mount[fullname])
