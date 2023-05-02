@@ -8,7 +8,7 @@ from tip.util import parse_package_specifier
 class Environment:
     """A TIP environment."""
 
-    def __init__(self, packages, path):
+    def __init__(self, *, path: str, packages: dict = None):
         self.packages = packages
         self._path = path
 
@@ -19,7 +19,7 @@ class Environment:
         if path is None:
             path = Environment.locate(name)
         with open(path, mode='r', encoding='utf8') as environment_file:
-            return Environment(json.load(environment_file), path)
+            return Environment(path=path, packages=json.load(environment_file))
 
     @staticmethod
     def locate(name):

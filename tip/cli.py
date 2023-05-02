@@ -130,7 +130,7 @@ def tipython(module_name: str, command: str, args: tuple[str]):
 def create(environment_name: str):
     """Create new environment."""
     try:
-        Environment({}, Environment.locate(environment_name)).save()
+        Environment(path=Environment.locate(environment_name)).save()
     except RuntimeError as ex:
         raise click.ClickException(ex)  # type: ignore
 
