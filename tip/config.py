@@ -97,7 +97,7 @@ def _dump_config_dict(config):
 
 
 def _enable_setkey():
-    """Enable magic methods for Config."""
+    """Enable assigning config values by `config['key'] = value` syntax."""
     this_module = sys.modules[__name__]
 
     @functools.wraps(ModuleType, updated=())
