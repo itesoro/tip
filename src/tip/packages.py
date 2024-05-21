@@ -32,6 +32,7 @@ def install(package_specifiers: list[str]):
 
 def make_link(package_specifier: str):
     """Make link to package identified by `package_specifier` in links directory."""
+    os.makedirs(config.LINKS_DIR, exist_ok=True)
     package_dir = locate(*parse_package_specifier(package_specifier))
     for folder_name in os.listdir(package_dir):
         folder_path = os.path.join(package_dir, folder_name)
@@ -68,7 +69,7 @@ def _install(package_specifier: str):
     if os.path.exists(package_dir):
         return
     os.makedirs(package_dir)
-    command = f"pip install --target={package_dir} {package_specifier}"
+    command = f"pip install --target={package_dir} --no-deps {package_specifier}"
     try:
         subprocess.check_output(command, shell=True)
     except Exception as ex:

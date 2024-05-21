@@ -74,6 +74,7 @@ def prepare_scripts():
 
 
 def _add_tip_to_path():
+    sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
     import tip
     rcfile_path = tip.shell.find_rcfile_path()
     if rcfile_path is None:
