@@ -1,7 +1,8 @@
 import os
-import shutil
 from importlib.abc import MetaPathFinder
 from importlib.util import spec_from_file_location
+
+from tip import cache
 
 
 class TipMetaFinder(MetaPathFinder):
@@ -18,7 +19,7 @@ class TipMetaFinder(MetaPathFinder):
             try:
                 path.append(self.packages_to_mount_cache[fullname])
             except KeyError:
-                self.packages_to_mount_cache[fullname] = _cache_package(self.packages_to_mount[fullname])
+                self.packages_to_mount_cache[fullname] = cache.add(self.packages_to_mount[fullname])
                 path.append(self.packages_to_mount_cache[fullname])
         if len(path) == 0:
             path.append(os.getcwd())
@@ -36,15 +37,3 @@ class TipMetaFinder(MetaPathFinder):
                 continue
             return spec_from_file_location(fullname, filename, submodule_search_locations=submodule_locations)
         return None
-
-
-def _cache_package(package_dir):
-    version = os.path.basename(package_dir)
-    versions_dir = os.path.dirname(package_dir)
-    name = os.path.basename(versions_dir)
-    cache_dir = os.path.join('/tmp/tip/cache', name, version)
-    try:
-        shutil.copytree(package_dir, cache_dir)
-    except FileExistsError:
-        pass
-    return cache_dir

@@ -6,7 +6,7 @@ import rich
 import click
 import rich.tree
 
-from tip import config, packages, runner
+from tip import cache, config, packages, runner
 from tip.config import LINKS_DIR
 from tip.environment import Environment
 
@@ -42,6 +42,7 @@ def info():
 @click.argument('package_specifiers', type=str, nargs=-1)
 def install(package_specifiers: list[str], environment_path: str | None):
     """Download and install packages by PACKAGE_SPECIFIERS to make them runnable with `tip run`."""
+    cache.clear()
     if environment_path is not None:
         env = Environment.load(path=environment_path)
     else:
@@ -59,6 +60,7 @@ def install(package_specifiers: list[str], environment_path: str | None):
 @click.argument('package_specifiers', type=str, nargs=-1)
 def uninstall(package_specifiers: tuple[str]):
     """Uninstall packages identified by package specifiers from site-packages."""
+    cache.clear()
     existing_package_specifiers = []
     for package_specifier in package_specifiers:
         if not packages.is_valid(package_specifier):
