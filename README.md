@@ -27,6 +27,18 @@ Show more info using `--help` with `tip` or concrete command.
 In order to use tip with VSCode you must install `tip` and then provide path to `tipython` executable as current
 interpreter. It will use **all installed libraries** in current tip directory. Read more in `tipython --help`.
 
+## Configuration
+
+Some settings can be configured using the `tip config set <key> <value>` command. Here is a list of keys you may want to
+change:
+
+| Setting             | Description                           |
+| ------------------- | ------------------------------------- |
+| `cache_dir`         | Directory where the packages cache is stored |
+| `site_packages_dir` | Directory where the packages are stored |
+
+There are additional keys in the config that are not listed here, as they are handled by special commands.
+
 ## Glossary
 
 **Package Specifier** - package name and version in format of `<package_name>==<package_version>`.
@@ -55,7 +67,7 @@ environment.
 
 ## Known Issues
 
-- Because of packages links we may reach packages that are not part of current environemnt but are part of other env
+- Because of packages links we may reach packages that are not part of current environment but are part of other env
 - `tip run -m module` error message when there is no `__main__.py` file may have better formatting
 - Uninstalling a package doesn't remove link: we must not just delete it but add link to other package version if it
 exists

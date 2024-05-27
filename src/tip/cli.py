@@ -16,6 +16,11 @@ def app():
     """TIP package manager."""
 
 
+@app.group(name="config")
+def config_():
+    """Configuration management."""
+
+
 @app.command()
 @click.argument('environment_name', type=str)
 def activate(environment_name: str):
@@ -28,13 +33,15 @@ def activate(environment_name: str):
 
 @app.command()
 def info():
-    """Display information about current tip environment."""
+    """Display information about current tip state."""
     site_packages_dir = config.get('site_packages_dir')
     active_env_name = config.get('active_environment_name')
+    cache_dir = config.get('cache_dir')
     active_env_path = Environment.locate(active_env_name)
-    click.echo(f"active env: {active_env_name}")
-    click.echo(f"active env location: {active_env_path}")
-    click.echo(f"site-packages directory: {site_packages_dir}")
+    click.echo(f"active env: {active_env_name!r}")
+    click.echo(f"active env location: {active_env_path!r}")
+    click.echo(f"site-packages directory: {site_packages_dir!r}")
+    click.echo(f"cache directory: {cache_dir!r}")
 
 
 @app.command()
@@ -186,6 +193,13 @@ def remove(package_specifiers: tuple[str], environment_path: str | None):
             click.echo(f"Package {package_specifier!r} not in environment")
         except ValueError:
             click.echo(f"Package {package_specifier!r} is in environment with different version")
+
+
+@config_.command('set')
+@click.argument('key', type=str)
+@click.argument('value', type=str)
+def set_(key: str, value: str):
+    config[key] = value
 
 
 def _at_most_one(*args: bool) -> bool:

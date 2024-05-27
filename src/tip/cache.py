@@ -1,8 +1,10 @@
 import os
 import shutil
 
+from tip import config
 
-CACHE_DIR = "/tmp/tip/cache"
+
+CACHE_DIR = config.get('cache_dir')
 
 
 def add(package_dir):
