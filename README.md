@@ -34,10 +34,12 @@ change:
 
 | Setting             | Description                           |
 | ------------------- | ------------------------------------- |
-| `cache_dir`         | Directory where the packages cache is stored |
-| `site_packages_dir` | Directory where the packages are stored |
+| `cache_dir`         | Directory where the packages cache is stored. When not set, cache is disabled. |
+| `site_packages_dir` | Directory where the packages are stored. |
 
 There are additional keys in the config that are not listed here, as they are handled by special commands.
+
+You can remove a setting by using `tip cache unset <key>`.
 
 ## Glossary
 

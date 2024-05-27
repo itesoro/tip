@@ -199,7 +199,15 @@ def remove(package_specifiers: tuple[str], environment_path: str | None):
 @click.argument('key', type=str)
 @click.argument('value', type=str)
 def set_(key: str, value: str):
+    """Set the config `key` to be `value`."""
     config[key] = value
+
+
+@config_.command('unset')
+@click.argument('key', type=str)
+def unset(key: str):
+    """Remove value of config named `key`."""
+    config[key] = None
 
 
 def _at_most_one(*args: bool) -> bool:

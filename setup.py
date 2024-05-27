@@ -51,8 +51,7 @@ def init_config():
         return
     config = {
         'site_packages_dir': os.path.join(TIP_DIR, 'site-packages'),
-        'active_environment_name': 'base',
-        'cache_dir': '/tmp/tip/cache'
+        'active_environment_name': 'base'
     }
     with open(config_path, mode='w+', encoding='utf8') as config_file:
         json.dump(config, config_file)
