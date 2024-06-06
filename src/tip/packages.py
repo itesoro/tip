@@ -5,7 +5,7 @@ import tempfile
 import subprocess
 from collections import deque
 
-from tip import config
+from tip import cache, config
 from tip.util import parse_package_specifier
 
 
@@ -102,4 +102,5 @@ def _install(package_specifier: str, /, *, wheel_path: str = None, dependencies=
         raise RuntimeError(f"Error while installing package {package_specifier!r}") from ex
     with open(os.path.join(package_dir, "dependencies.json"), mode='w') as dependencies_file:
         json.dump(dependencies or {}, dependencies_file)
+    cache.get(package_dir)  # Invalidate cache
     make_link(package_specifier)

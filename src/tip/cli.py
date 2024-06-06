@@ -62,7 +62,6 @@ def install(package_specifiers: list[str], environment_path: str):
         environment_path = environment_path or Environment.locate(config.get('active_environment_name'))
         env = Environment.load(path=environment_path)
         package_specifiers = [packages.make_package_specifier(k, v) for k, v in env.packages.items()]
-    cache.clear()
     try:
         packages.install(package_specifiers)
     except Exception as ex:
@@ -73,7 +72,6 @@ def install(package_specifiers: list[str], environment_path: str):
 @click.argument('package_specifiers', type=str, nargs=-1)
 def uninstall(package_specifiers: tuple[str]):
     """Uninstall packages identified by package specifiers from site-packages."""
-    cache.clear()
     existing_package_specifiers = []
     for package_specifier in package_specifiers:
         if not packages.is_valid(package_specifier):
@@ -84,6 +82,8 @@ def uninstall(package_specifiers: tuple[str]):
             existing_package_specifiers.append(package_specifier)
     for package_specifier in existing_package_specifiers:
         packages.uninstall(package_specifier)
+        package_dir = packages.locate(*packages.parse_package_specifier(package_specifier))
+        cache.clear(package_dir)
 
 
 @app.command(name='list')
