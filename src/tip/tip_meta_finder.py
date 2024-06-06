@@ -17,13 +17,7 @@ class TipMetaFinder(MetaPathFinder):
         # pylint: disable=unused-argument
         path = []
         if fullname in self.packages_to_mount:
-            try:
-                path.append(self.packages_to_mount_cache[fullname])
-            except KeyError:
-                self.packages_to_mount_cache[fullname] = cache.add(self.packages_to_mount[fullname])
-                path.append(self.packages_to_mount_cache[fullname])
-            except AttributeError:
-                path.append(self.packages_to_mount[fullname])
+            path.append(cache.get(self.packages_to_mount[fullname]))
         if len(path) == 0:
             path.append(os.getcwd())
         if "." in fullname:

@@ -41,12 +41,14 @@ def install(package_specifiers: list[str]):
             wheel_path = os.path.join(temp_dir, download_output.decode('utf8').split('\n')[-3].replace('Saved ', ''))
             dry_run_report_path = os.path.join(temp_dir, 'dry-run-report.json')
             subprocess.run(f"pip install --dry-run {wheel_path} --report {dry_run_report_path}", shell=True, check=True)
+            dependencies = []
             with open(dry_run_report_path) as report_file:
                 dry_run_report = json.load(report_file)
                 for package in dry_run_report['install']:
                     package_metadata = package['metadata']
-                    queue.append(f"{package_metadata['name']}=={package_metadata['version']}")
-            _install(package_specifier, wheel_path=wheel_path)
+                    dependencies.append(f"{package_metadata['name']}=={package_metadata['version']}")
+            _install(package_specifier, wheel_path=wheel_path, dependencies=dependencies)
+            queue.extend(dependencies)
 
 
 def make_link(package_specifier: str):
@@ -56,7 +58,7 @@ def make_link(package_specifier: str):
     for folder_name in os.listdir(package_dir):
         folder_path = os.path.join(package_dir, folder_name)
         link_path = os.path.join(config.LINKS_DIR, folder_name)
-        if os.path.exists(link_path):
+        if os.path.islink(link_path):
             os.unlink(link_path)
         os.symlink(folder_path, link_path)
 
@@ -81,7 +83,7 @@ def uninstall(package_specifier: str):
     shutil.rmtree(package_dir)
 
 
-def _install(package_specifier: str, /, *, wheel_path: str = None):
+def _install(package_specifier: str, /, *, wheel_path: str = None, dependencies=None):
     """
     Install new package identified by `package_specifier` to make it available for environments.
 
@@ -98,4 +100,6 @@ def _install(package_specifier: str, /, *, wheel_path: str = None):
     except Exception as ex:
         shutil.rmtree(package_dir)
         raise RuntimeError(f"Error while installing package {package_specifier!r}") from ex
+    with open(os.path.join(package_dir, "dependencies.json"), mode='w') as dependencies_file:
+        json.dump(dependencies or {}, dependencies_file)
     make_link(package_specifier)
