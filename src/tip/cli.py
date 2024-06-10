@@ -1,12 +1,14 @@
 import os
 import sys
+import json
+from collections import deque
 from typing import no_type_check
 
 import rich
 import click
 import rich.tree
 
-from tip import config, packages, runner
+from tip import cache, config, packages, runner
 from tip.config import LINKS_DIR
 from tip.environment import Environment
 
@@ -14,6 +16,11 @@ from tip.environment import Environment
 @click.group()
 def app():
     """TIP package manager."""
+
+
+@app.group(name="config")
+def config_():
+    """Configuration management."""
 
 
 @app.command()
@@ -28,29 +35,35 @@ def activate(environment_name: str):
 
 @app.command()
 def info():
-    """Display information about current tip environment."""
+    """Display information about current tip state."""
     site_packages_dir = config.get('site_packages_dir')
     active_env_name = config.get('active_environment_name')
+    cache_dir = config.get('cache_dir')
     active_env_path = Environment.locate(active_env_name)
-    click.echo(f"active env: {active_env_name}")
-    click.echo(f"active env location: {active_env_path}")
-    click.echo(f"site-packages directory: {site_packages_dir}")
+    click.echo(f"active env: {active_env_name!r}")
+    click.echo(f"active env location: {active_env_path!r}")
+    click.echo(f"site-packages directory: {site_packages_dir!r}")
+    click.echo(f"cache directory: {cache_dir!r}")
 
 
 @app.command()
-@click.option('--env', '-e', 'environment_path', type=str, default=None)
 @click.argument('package_specifiers', type=str, nargs=-1)
-def install(package_specifiers: list[str], environment_path: str | None):
-    """Download and install packages by PACKAGE_SPECIFIERS to make them runnable with `tip run`."""
-    if environment_path is not None:
+@click.option('--env', '-e', 'environment_path', type=str, default=None)
+def install(package_specifiers: list[str], environment_path: str):
+    """
+    Download and install packages to make them runnable with `tip run`.
+
+    When PACKAGE_SPECIFIERS is not empty, install all these packages. If given ENVIRONMENT_PATH, install all packages
+    from this environment. Otherwise install packages from the active environment.
+    """
+    if not _at_most_one(package_specifiers, environment_path):
+        raise click.ClickException("At most one of PACKAGE_SPECIFIERS or ENVIRONMENT_PATH should be specified")
+    if len(package_specifiers) == 0:
+        environment_path = environment_path or Environment.locate(config.get('active_environment_name'))
         env = Environment.load(path=environment_path)
-    else:
-        env = Environment.load(name=config.get('active_environment_name'))
+        package_specifiers = [packages.make_package_specifier(k, v) for k, v in env.packages.items()]
     try:
         packages.install(package_specifiers)
-        for package_specifier in package_specifiers:
-            env.add_package(package_specifier)
-        env.save()
     except Exception as ex:
         raise click.ClickException(str(ex))
 
@@ -69,31 +82,71 @@ def uninstall(package_specifiers: tuple[str]):
             existing_package_specifiers.append(package_specifier)
     for package_specifier in existing_package_specifiers:
         packages.uninstall(package_specifier)
+        package_dir = packages.locate(*packages.parse_package_specifier(package_specifier))
+        cache.clear(package_dir)
 
 
 @app.command(name='list')
-@click.option('--active-env', '-a', 'active_env', is_flag=True)
-@click.option('--path', '-p', 'env_path', type=str, default="")
-@click.option('--name', '-n', 'env_name', type=str, default="")
+@click.option('--env', '-e', 'environment_path', type=str, default=None)
+@click.option('--installed', '-i', 'installed', is_flag=True, default=False)
 @no_type_check
-def list_(active_env: bool, env_path: str, env_name: str):
-    """Displays tree: ACTIVE_ENV, ENV_PATH or ENV_NAME environment packages or installed packages without options."""
-    if not _at_most_one(active_env, env_path != "", env_name != ""):
-        raise click.ClickException("At most one of ACTIVE_ENV, ENV_PATH or ENV_NAME should be specified")
-    if active_env:
-        tree = _make_environment_packages_tree(Environment.locate(config.get('active_environment_name')))
-    elif env_path != "":
-        tree = _make_environment_packages_tree(env_path)
-    elif env_name != "":
-        tree = _make_environment_packages_tree(Environment.locate(env_name))
+def list_(environment_path: str | None, installed: bool):
+    """
+    Show list of packages.
+
+    If ENVIRONMENT_PATH is set, then display packages in this environment. If used with INSTALLED, displays all
+    installed packages. Without these options it displays packages in the active environment
+    """
+    if not _at_most_one(environment_path, installed):
+        raise click.ClickException("At most one of ENVIRONMENT_PATH or INSTALLED should be specified")
+    if not installed:
+        environment_path = environment_path or Environment.locate(config.get('active_environment_name'))
+        tree = _make_environment_packages_tree(environment_path)
     else:
         tree = _make_installed_packages_tree()
     rich.print(tree)
 
 
+@app.command()
+@click.option('--env', '-e', 'environment_path', type=str, default=None)
+def dependencies(environment_path: str | None):
+    """
+    Display dependencies of the dependencies.
+
+    It shows dependencies of the packages that are in the environment  at ENVIRONMENT_PATH or in the active environment.
+    It doesn't show packages that are present in the environment. This is helpful when you need to add these packages
+    to the environment using `tip add` command.
+    """
+    if environment_path is None:
+        env = Environment.load(name=config.get('active_environment_name'))
+    else:
+        env = Environment.load(path=environment_path)
+    env_packages = [packages.make_package_specifier(k, v) for k, v in env.packages.items()]
+    queue = deque(env_packages)
+    seen = set(env_packages)
+    dependencies_list = []
+    while len(queue) > 0:
+        package = queue.popleft()
+        package_dir = packages.locate(*packages.parse_package_specifier(package))
+        try:
+            with open(os.path.join(package_dir, "dependencies.json")) as f:
+                dependencies = json.load(f)
+        except FileNotFoundError:
+            click.echo(f"{package} is not installed or corrupted, skipping its dependencies")
+            continue
+        for dependency in dependencies:
+            if dependency in seen:
+                continue
+            dependencies_list.append(dependency)
+            queue.append(dependency)
+            seen.add(dependency)
+    if len(dependencies_list) > 0:
+        click.echo(' '.join(dependencies_list))
+
+
 @app.command(context_settings={'ignore_unknown_options': True})
 @click.option('-m', '--module', 'module_name', type=str)
-@click.option('--env', '-e', 'environment_path', type=str)
+@click.option('--env', '-e', 'environment_path', type=str, default=None)
 @click.option('-c', 'command')
 @click.option('--install-missing', 'install_missing', is_flag=True)
 @click.argument('args', nargs=-1, type=click.UNPROCESSED)
@@ -138,10 +191,7 @@ def create(environment_name: str):
 @app.command()
 @click.option('--from_path', '-f', 'from_path', type=str, help="Environment to add all packages from")
 @click.argument('package_specifiers', type=str, nargs=-1)
-@click.option(
-    '--environment_path', '-e', 'environment_path', type=str,
-    help="Path of the environment to add packages to", required=False, default=None
-)
+@click.option('--env', '-e', 'environment_path', type=str, default=None)
 def add(package_specifiers: tuple[str], environment_path: str | None, from_path: str):
     """
     Add packages to the environment.
@@ -166,7 +216,7 @@ def add(package_specifiers: tuple[str], environment_path: str | None, from_path:
 
 @app.command()
 @click.argument('package_specifiers', type=str, nargs=-1)
-@click.option('--environment_path', '-e', 'environment_path', type=str, default=None)
+@click.option('--env', '-e', 'environment_path', type=str, default=None)
 def remove(package_specifiers: tuple[str], environment_path: str | None):
     """
     Remove packages from the environment.
@@ -184,11 +234,27 @@ def remove(package_specifiers: tuple[str], environment_path: str | None):
             click.echo(f"Package {package_specifier!r} not in environment")
         except ValueError:
             click.echo(f"Package {package_specifier!r} is in environment with different version")
+    env.save()
+
+
+@config_.command('set')
+@click.argument('key', type=str)
+@click.argument('value', type=str)
+def set_(key: str, value: str):
+    """Set the config `key` to be `value`."""
+    config[key] = value
+
+
+@config_.command('unset')
+@click.argument('key', type=str)
+def unset(key: str):
+    """Remove value of config named `key`."""
+    config[key] = None
 
 
 def _at_most_one(*args: bool) -> bool:
     """Returns True if at most one of the arguments is True."""
-    return sum(args) <= 1
+    return sum(bool(x) for x in args) <= 1
 
 
 def _make_installed_packages_tree() -> rich.tree.Tree:
