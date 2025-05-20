@@ -22,7 +22,8 @@ class TipMetaFinder(MetaPathFinder):
             path.append(os.getcwd())
         if "." in fullname:
             *_, name = fullname.split(".")
-        name = fullname
+        else:
+            name = fullname
         for entry in path:
             if os.path.isdir(os.path.join(entry, name)):
                 filename = os.path.join(entry, name, "__init__.py")
